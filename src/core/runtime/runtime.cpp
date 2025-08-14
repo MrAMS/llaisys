@@ -54,6 +54,10 @@ storage_t Runtime::allocateHostStorage(size_t size) {
     return std::shared_ptr<Storage>(new Storage((std::byte *)_api->malloc_host(size), size, *this, true));
 }
 
+void Runtime::memcpySync(void *dst, const void *src, size_t size, llaisysMemcpyKind_t kind){
+    _api->memcpy_sync(dst, src, size, kind);
+}
+
 void Runtime::freeStorage(Storage *storage) {
     if (storage->isHost()) {
         _api->free_host(storage->memory());

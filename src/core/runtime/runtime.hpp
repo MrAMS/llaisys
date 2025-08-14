@@ -39,6 +39,9 @@ public:
     storage_t allocateDeviceStorage(size_t size);
     ;
     storage_t allocateHostStorage(size_t size);
+
+    void memcpySync(void *dst, const void *src, size_t size, llaisysMemcpyKind_t kind);
+
     void freeStorage(Storage *storage);
 
     llaisysStream_t stream() const;

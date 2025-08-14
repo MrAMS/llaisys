@@ -2,6 +2,7 @@
 
 #include "../utils.hpp"
 
+#include <cstddef>
 #include <cstring>
 #include <numeric>
 #include <sstream>
@@ -16,6 +17,7 @@ tensor_t Tensor::create(const std::vector<size_t> &shape,
                         llaisysDeviceType_t device_type,
                         int device) {
     size_t ndim_ = shape.size();
+    // 张量每个维度上坐标 +1 时,数据指针跨过的范围,一个 2x3x4 张量,其strides为 [3*4*1, 4*1, 1]
     std::vector<ptrdiff_t> strides(ndim_);
     size_t stride = 1;
     for (size_t i = 1; i <= ndim_; i++) {
@@ -164,27 +166,87 @@ void Tensor::debug() const {
 }
 
 bool Tensor::isContiguous() const {
-    TO_BE_IMPLEMENTED();
+    // shape = [1, 2, 3] strides = [6, 3, 1]
+    ptrdiff_t exp_stride = 1;
+    for (size_t i = 1; i <= ndim(); i++) {
+        auto idx = ndim() - i;
+        if(_meta.strides[idx] != exp_stride) return false;
+        exp_stride *= shape()[idx];
+    }
     return true;
 }
 
 tensor_t Tensor::permute(const std::vector<size_t> &order) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    if(order.size() != ndim()) {
+        throw std::runtime_error("Permute order size must match tensor ndim.");
+    }
+    auto new_meta = _meta;
+    for(size_t i=0;i<ndim();++i){
+        new_meta.shape[i] = _meta.shape[order[i]];
+        new_meta.strides[i] = _meta.strides[order[i]];
+    }
+    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage));
 }
 
 tensor_t Tensor::view(const std::vector<size_t> &shape) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    // shape [2,3,5] strides [15, 5, 1] <-> shape [2, 15] strikes [15, 1]
+    auto new_meta = _meta;
+
+    new_meta.shape = shape;
+    size_t new_ndim_ = shape.size();
+    new_meta.strides.resize(new_ndim_);
+    size_t new_stride = 1;
+    for (size_t i = 1; i <= new_ndim_; i++) {
+        auto idx = new_ndim_-i;
+        new_meta.strides[idx] = new_stride;
+        new_stride *= shape[idx];
+    }
+    if(numel() != new_stride){
+        throw std::runtime_error("Cannot view tensor to a different number of elements.");
+    }
+    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage));
 }
 
 tensor_t Tensor::slice(size_t dim, size_t start, size_t end) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    /*
+    [[ 1,  2,  3,  4],
+     [ 5,  6,  7,  8],
+     [ 9, 10, 11, 12]
+    ]
+    dim=0, start=1, end=3
+    [
+     [ 5,  6,  7,  8],
+     [ 9, 10, 11, 12]
+    ]
+    dim=1, start=0, end=3
+    [[ 1,  2,  3],
+     [ 5,  6,  7],
+     [ 9, 10, 11]
+    ]
+    dim=1 start=1, end=4
+    [[ 2,  3,  4],
+     [ 6,  7,  8],
+     [ 10, 11, 12]
+    ]
+    */
+    if(dim >= ndim()) {
+        throw std::runtime_error("Slice dimension out of bounds.");
+    }
+    if(start >= end || end > shape()[dim]) {
+        throw std::runtime_error("Invalid slice range.");
+    }
+    auto new_meta = _meta;
+    new_meta.shape[dim] = end - start;
+    auto new_offset = _offset + start * _meta.strides[dim] * elementSize();
+    
+    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage, new_offset));
 }
 
 void Tensor::load(const void *src_) {
-    TO_BE_IMPLEMENTED();
+    auto sz = numel() * elementSize();
+    core::context().runtime().memcpySync(data(), src_,
+        sz,
+        deviceType() == LLAISYS_DEVICE_CPU ? LLAISYS_MEMCPY_H2H : LLAISYS_MEMCPY_H2D);
 }
 
 tensor_t Tensor::contiguous() const {

@@ -14,9 +14,9 @@ struct TensorMeta {
 
 class Tensor {
 private:
-    TensorMeta _meta;
-    core::storage_t _storage;
-    size_t _offset;
+    TensorMeta _meta; // 描述张量形状、数据类型和步长的元数据
+    core::storage_t _storage; // 指向存储张量数据的内存块的共享指针。它可以被多个张量共享
+    size_t _offset; // 张量在存储中的起始索引（以字节为单位）
     Tensor(TensorMeta meta, core::storage_t storage, size_t offset = 0);
 
 public:
