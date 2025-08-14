@@ -1,0 +1,1 @@
+. .venv/bin/activate && xmake && xmake install && uv pip install ./python/ && python test/test_$1.py
