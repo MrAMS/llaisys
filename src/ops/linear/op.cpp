@@ -14,7 +14,9 @@ void linear(tensor_t out, tensor_t in, tensor_t weight, tensor_t bias) {
     CHECK_ARGUMENT(weight->ndim()==2, "Linear: out must be a 2D tensor");
     if(bias) CHECK_ARGUMENT(bias->ndim()==1, "Linear: out must be a 1D tensor");
 
+    // 注意是in矩阵乘weight的转置
     CHECK_ARGUMENT(out->shape()[0]==in->shape()[0] && out->shape()[1]==weight->shape()[0], "Linear: out tensor shape mismatched");
+    CHECK_ARGUMENT(in->shape()[1]==weight->shape()[1], "Linear: in and weight tensor shape mismatch");
     if(bias) CHECK_ARGUMENT(out->shape()[1] == bias->shape()[0], "Linear: out tensor shape must match bias tensor");
 
     CHECK_ARGUMENT(out->isContiguous(), "Linear: out must be a contiguous tensor");
