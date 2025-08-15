@@ -177,9 +177,7 @@ bool Tensor::isContiguous() const {
 }
 
 tensor_t Tensor::permute(const std::vector<size_t> &order) const {
-    if(order.size() != ndim()) {
-        throw std::runtime_error("Permute order size must match tensor ndim.");
-    }
+    CHECK_ARGUMENT(order.size() == ndim(), "Permute order size must match tensor ndim.");
     auto new_meta = _meta;
     for(size_t i=0;i<ndim();++i){
         new_meta.shape[i] = _meta.shape[order[i]];
@@ -201,9 +199,7 @@ tensor_t Tensor::view(const std::vector<size_t> &shape) const {
         new_meta.strides[idx] = new_stride;
         new_stride *= shape[idx];
     }
-    if(numel() != new_stride){
-        throw std::runtime_error("Cannot view tensor to a different number of elements.");
-    }
+    CHECK_ARGUMENT(numel() == new_stride, "Cannot view tensor to a different number of elements.");
     return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage));
 }
 
@@ -229,12 +225,9 @@ tensor_t Tensor::slice(size_t dim, size_t start, size_t end) const {
      [ 10, 11, 12]
     ]
     */
-    if(dim >= ndim()) {
-        throw std::runtime_error("Slice dimension out of bounds.");
-    }
-    if(start >= end || end > shape()[dim]) {
-        throw std::runtime_error("Invalid slice range.");
-    }
+    CHECK_ARGUMENT(dim < ndim(), "Slice dimension out of bounds.");
+    CHECK_ARGUMENT(start < end, "Slice start must be less than end.");
+    CHECK_ARGUMENT(end <= shape()[dim], "Slice end must be within the dimension size.");
     auto new_meta = _meta;
     new_meta.shape[dim] = end - start;
     auto new_offset = _offset + start * _meta.strides[dim] * elementSize();

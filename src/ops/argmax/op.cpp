@@ -14,8 +14,9 @@ void argmax(tensor_t max_idx, tensor_t max_val, tensor_t vals) {
 
     // TODO
     CHECK_ARGUMENT(vals->ndim() == 1, "Argmax: vals must be a 1D tensor for now.");
-    CHECK_ARGUMENT(max_idx->ndim() == 1 && max_idx->numel()==1, "Argmax: max_idx must be a 1D tensor.");
-    CHECK_ARGUMENT(max_val->ndim() == 1 && max_val->numel()==1, "Argmax: max_val must be a 1D tensor.");
+    CHECK_ARGUMENT(max_idx->ndim() == 1 && max_idx->numel()==1, "Argmax: max_idx must be a 1D tensor for now.");
+    CHECK_ARGUMENT(max_val->ndim() == 1 && max_val->numel()==1, "Argmax: max_val must be a 1D tensor for now.");
+    CHECK_ARGUMENT(vals->isContiguous(), "Argmax: vals must be a contiguous tensor.");
 
     const auto device_type = vals->deviceType();
     llaisys::core::context().setDevice(device_type, vals->deviceId());
