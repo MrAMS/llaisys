@@ -12,6 +12,10 @@ void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
     CHECK_ARGUMENT(out->shape()==in->shape(), "ROPE: in and out tensor shape mismatch");
     CHECK_ARGUMENT(out->shape()[0]==pos_ids->shape()[0], "ROPE: pos_ids tensor shape mismatch");
 
+    CHECK_ARGUMENT(out->isContiguous(), "ROPE: out tensor must be contiguous");
+    CHECK_ARGUMENT(in->isContiguous(), "ROPE: in tensor must be contiguous");
+    CHECK_ARGUMENT(pos_ids->isContiguous(), "ROPE: pos_ids tensor must be contiguous");
+
     const auto device_type = out->deviceType();
     llaisys::core::context().setDevice(device_type, out->deviceId());
 
