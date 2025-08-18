@@ -17,46 +17,46 @@ void self_attention_(T *attn_val, const T *q, const T *k, const T *v,
             for(size_t h=0;h<d_head;++h){
                 const auto h_kv = h/(d_head/d_kvhead);
                 std::vector<float> attn_scores(d_tot); // 临时数据暂存（scores矩阵中的一行）
-                    // 计算Attention Scores
-                    for(size_t j=0;j<d_tot;++j){ // 遍历scores矩阵的每一列
-                        attn_scores[j] = 0; 
-                        for(size_t l=0;l<d_qk;++l){ // 计算Q@K.T
-                            const auto q_idx = s*d_head*d_qk + h*d_qk + l;
-                            // TODO Cache Hit优化,K应该变为[d_kvhead, d_tot, d_qk]
-                            const auto k_idx = j*d_kvhead*d_qk + h_kv*d_qk + l; 
-                            attn_scores[j] += TOF(q[q_idx]) * TOF(k[k_idx]);
-                        }
-                        attn_scores[j] *= scale;
+                // 计算Attention Scores
+                for(size_t j=0;j<d_tot;++j){ // 遍历scores矩阵的每一列
+                    attn_scores[j] = 0; 
+                    for(size_t l=0;l<d_qk;++l){ // 计算Q@K.T
+                        const auto q_idx = s*d_head*d_qk + h*d_qk + l;
+                        // TODO Cache Hit优化,K应该变为[d_kvhead, d_tot, d_qk]
+                        const auto k_idx = j*d_kvhead*d_qk + h_kv*d_qk + l; 
+                        attn_scores[j] += TOF(q[q_idx]) * TOF(k[k_idx]);
                     }
-                    // 计算Causal Softmax
-                    const auto causal_len = std::min(s+1, d_tot);
-                    float max_score = attn_scores[0];
-                    for(size_t j=1;j<causal_len;++j){
-                        if(attn_scores[j] > max_score){
-                            max_score = attn_scores[j];
-                        }
+                    attn_scores[j] *= scale;
+                }
+                // 计算Causal Softmax
+                const auto causal_len = std::min(s+1, d_tot);
+                float max_score = attn_scores[0];
+                for(size_t j=1;j<causal_len;++j){
+                    if(attn_scores[j] > max_score){
+                        max_score = attn_scores[j];
                     }
-                    float sum_exp = 0;
-                    for(size_t j=0;j<causal_len;++j){
-                        attn_scores[j] = std::exp(attn_scores[j] - max_score);
-                        sum_exp += attn_scores[j];
-                    }
-                    for(size_t j=0;j<causal_len;++j){
-                        attn_scores[j] /= sum_exp;
-                    }
+                }
+                float sum_exp = 0;
+                for(size_t j=0;j<causal_len;++j){
+                    attn_scores[j] = std::exp(attn_scores[j] - max_score);
+                    sum_exp += attn_scores[j];
+                }
+                for(size_t j=0;j<causal_len;++j){
+                    attn_scores[j] /= sum_exp;
+                }
 
-                    // 计算scores @ V
-                    for(size_t j=0;j<d_v;++j){ // 遍历out的每一列
-                        float res = 0;
-                        for(size_t l=0;l<causal_len;++l){ // 计算scores @ V
-                            // TODO Cache Hit优化,V应该变为[d_kvhead, d_v, d_tot]
-                            const auto v_idx = l*d_kvhead*d_v + h_kv*d_v + j;
-                            const auto a_idx = l;
-                            res += attn_scores[a_idx] * TOF(v[v_idx]);
-                        }
-                        const auto out_idx = s*d_head*d_v + h*d_v + j;
-                        attn_val[out_idx] = llaisys::utils::cast<T>(res);
+                // 计算scores @ V
+                for(size_t j=0;j<d_v;++j){ // 遍历out的每一列
+                    float res = 0;
+                    for(size_t l=0;l<causal_len;++l){ // 计算scores @ V
+                        // TODO Cache Hit优化,V应该变为[d_kvhead, d_v, d_tot]
+                        const auto v_idx = l*d_kvhead*d_v + h_kv*d_v + j;
+                        const auto a_idx = l;
+                        res += attn_scores[a_idx] * TOF(v[v_idx]);
                     }
+                    const auto out_idx = s*d_head*d_v + h*d_v + j;
+                    attn_val[out_idx] = llaisys::utils::cast<T>(res);
+                }
             }
         }
     }
