@@ -6,9 +6,17 @@
 __C {
     struct LlaisysQwen2Meta {
         llaisysDataType_t dtype;
-        size_t nlayer, hs, nh, nkvh, dh, di, maxseq, voc;
-        float epsilon, theta;
-        int64_t end_token;
+        size_t nlayer; // num_hidden_layers
+        size_t hs; // hidden_size
+        size_t nh; // num_attention_heads
+        size_t nkvh; // num_key_value_heads
+        size_t dh; // per_head_dim
+        size_t di; // intermediate_size
+        size_t maxseq; // max_position_embeddings
+        size_t voc; // vocab_size
+        float epsilon; // rms_norm_eps
+        float theta; // rope_theta
+        int64_t end_token; // eos_token_id
     };
 
     struct LlaisysQwen2Weights {
@@ -29,13 +37,24 @@ __C {
         llaisysTensor_t *mlp_down_w;
     };
 
-    struct LlaisysQwen2Model;
+    struct LlaisysQwen2Model{
+        llaisysDeviceType_t device;
+        int* device_ids;
+        size_t ndevice;
+        const LlaisysQwen2Meta *meta;
+        struct LlaisysQwen2Weights* weights;
+        llaisysTensor_t* k_caches;
+        llaisysTensor_t* v_caches;
+        size_t kv_cached_row; // tot_seq_len
+    };
 
     __export struct LlaisysQwen2Model *llaisysQwen2ModelCreate(const LlaisysQwen2Meta *meta, llaisysDeviceType_t device, int *device_ids, int ndevice);
 
     __export void llaisysQwen2ModelDestroy(struct LlaisysQwen2Model * model);
 
     __export struct LlaisysQwen2Weights *llaisysQwen2ModelWeights(struct LlaisysQwen2Model * model);
+
+    __export void llaisysQwen2ModelAllocKVCache(struct LlaisysQwen2Model * model, size_t max_seq_len);
 
     __export int64_t llaisysQwen2ModelInfer(struct LlaisysQwen2Model * model, int64_t * token_ids, size_t ntoken);
 }

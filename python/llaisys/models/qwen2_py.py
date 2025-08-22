@@ -52,6 +52,8 @@ class Qwen2:
         for i in range(self.num_layers):
             self.layers.append(Qwen2Layer(i, self.num_atten_heads, self.num_key_value_heads, self.rms_norm_eps, self.rope_theta, device))
 
+        print("Loading weights...", flush=True)
+
         for file in sorted(model_path.glob("*.safetensors")):
             # with open(file, "rb") as f:
             #     data_ = safetensors.deserialize(f.read()) # [("tensor_name", {"shape": [2, 3], "dtype": "F32", "data": b"\0\0.." }), (...)]
@@ -66,7 +68,7 @@ class Qwen2:
                     if self.dtype == DataType.F32:
                         tensor = tensor.to(torch.float32)
                     shape = tensor.shape
-                    weight = Tensor(shape=shape, dtype=DataType.from_torch_dtype(tensor.dtype), device=device)
+                    weight = Tensor(shape=shape, dtype=DataType.from_torch(tensor.dtype), device=device)
                     weight.load(tensor.data_ptr())
                     
                     if weight_name == "model.embed_tokens.weight":
@@ -234,15 +236,20 @@ class Qwen2Layer:
         debug(f"post_atten_layernorm...")
         post_atten_layernorm = Tensor(shape=(d_seq, d_emb), dtype=dtype, device=self.device)
         Ops.rms_norm(out=post_atten_layernorm, inp=attn_residual, weight=self.post_atten_layernorm_weight, eps=self.rms_norm_eps)
+        
 
         # MLP
         debug(f"mlp...")
         mlp_out = self._mlp(post_atten_layernorm)
+        mlp_out.debug()
+        
 
         # 残差连接
         debug(f"mlp_residual...")
         mlp_residual = Tensor(shape=(d_seq, d_emb), dtype=dtype, device=self.device)
         Ops.add(c=mlp_residual, a=attn_residual, b=mlp_out)
+        mlp_residual.debug()
+        exit()
 
         return mlp_residual
         

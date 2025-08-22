@@ -1,1 +1,1 @@
-. .venv/bin/activate && xmake && xmake install && uv pip install ./python/
+. .venv/bin/activate && xmake build && xmake install && uv pip install ./python/

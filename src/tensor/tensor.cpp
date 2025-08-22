@@ -15,7 +15,6 @@ Tensor::Tensor(TensorMeta meta, core::storage_t storage, size_t offset)
 tensor_t Tensor::create(const std::vector<size_t> &shape,
                         llaisysDataType_t dtype,
                         llaisysDeviceType_t device_type,
-                        size_t offset,
                         int device) {
     size_t ndim_ = shape.size();
     // 张量每个维度上坐标 +1 时,数据指针跨过的范围,一个 2x3x4 张量,其strides为 [3*4*1, 4*1, 1]
@@ -31,12 +30,17 @@ tensor_t Tensor::create(const std::vector<size_t> &shape,
 
     if (device_type == LLAISYS_DEVICE_CPU && core::context().runtime().deviceType() != LLAISYS_DEVICE_CPU) {
         auto storage = core::context().runtime().allocateHostStorage(total_elems * dtype_size);
-        return std::shared_ptr<Tensor>(new Tensor(meta, storage, offset));
+        return std::shared_ptr<Tensor>(new Tensor(meta, storage, 0));
     } else {
         core::context().setDevice(device_type, device);
         auto storage = core::context().runtime().allocateDeviceStorage(total_elems * dtype_size);
-        return std::shared_ptr<Tensor>(new Tensor(meta, storage, offset));
+        return std::shared_ptr<Tensor>(new Tensor(meta, storage, 0));
     }
+}
+
+tensor_t Tensor::create_none(){
+    TensorMeta meta{llaisysDataType_t::LLAISYS_DTYPE_INVALID, {}, {}};
+    return std::shared_ptr<Tensor>(new Tensor(meta, nullptr, 0));
 }
 
 std::byte *Tensor::data() {
@@ -189,6 +193,10 @@ bool Tensor::isContiguous() const {
         exp_stride *= shape()[idx];
     }
     return true;
+}
+
+bool Tensor::isNone() const {
+    return ndim()==0;
 }
 
 tensor_t Tensor::permute(const std::vector<size_t> &order) const {

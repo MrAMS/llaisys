@@ -24,8 +24,8 @@ public:
         const std::vector<size_t> &shape,
         llaisysDataType_t dtype,
         llaisysDeviceType_t device_type = LLAISYS_DEVICE_CPU,
-        size_t offset = 0,
         int device = 0);
+    static tensor_t create_none();
     ~Tensor() = default;
     // Info
     std::byte *data();
@@ -43,6 +43,8 @@ public:
     void debug() const;
 
     bool isContiguous() const;
+
+    bool isNone() const;
 
     // Meta Transform
     tensor_t permute(const std::vector<size_t> &order) const;

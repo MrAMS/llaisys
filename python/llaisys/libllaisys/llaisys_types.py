@@ -59,7 +59,7 @@ class DataType(IntEnum):
             raise ValueError(f"Unsupported safetensors dtype: {dtype}")
         
     @classmethod
-    def from_torch_dtype(cls, dtype) -> "DataType":
+    def from_torch(cls, dtype) -> "DataType":
         import torch
         if dtype == torch.bfloat16:
             return cls.BF16

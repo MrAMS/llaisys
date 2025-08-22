@@ -4,6 +4,8 @@ set_encodings("utf-8")
 add_includedirs("include")
 
 -- set_policy("build.sanitizer.address", true)
+-- set_symbols("debug")
+add_rules("plugin.compile_commands.autoupdate")
 
 -- CPU --
 includes("xmake/cpu.lua")
@@ -108,6 +110,7 @@ target("llaisys")
     set_languages("cxx17")
     set_warnings("all", "error")
     add_files("src/llaisys/*.cc")
+    add_files("src/llaisys/models/*.cpp")
     set_installdir(".")
 
     
