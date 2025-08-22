@@ -241,15 +241,12 @@ class Qwen2Layer:
         # MLP
         debug(f"mlp...")
         mlp_out = self._mlp(post_atten_layernorm)
-        mlp_out.debug()
         
 
         # 残差连接
         debug(f"mlp_residual...")
         mlp_residual = Tensor(shape=(d_seq, d_emb), dtype=dtype, device=self.device)
         Ops.add(c=mlp_residual, a=attn_residual, b=mlp_out)
-        mlp_residual.debug()
-        exit()
 
         return mlp_residual
         
