@@ -27,7 +27,7 @@ class Qwen2:
         if model_path is not None and Path(model_path).exists():
             print(f"Using local model path: {model_path}", flush=True)
         else:
-            print("Model path not provided or does not exist. Downloading from ModelScope...", flush=True)
+            print("Model path not provided or does not exist. Downloading from Huggingface...", flush=True)
             model_path = Path(snapshot_download("deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"))
             print(f"Model downloaded to: {model_path}", flush=True)
         
@@ -98,7 +98,7 @@ class Qwen2:
 
         d_vocab = self.lm_head_weight.shape()[0]
         logits = Tensor(shape=(d_seq, d_vocab), dtype=dtype, device=self.device)
-        Ops.linear(out=logits, inp=normalized, weight=self.lm_head_weight, bias=None)
+        Ops.linear(out=logits, inp=normalized, weight=self.lm_head_weight)
 
         return logits
 
@@ -112,9 +112,11 @@ class Qwen2:
     ):
         prefill_len = len(inputs)
         max_seq_len = prefill_len + max_new_tokens
+        print("Allocate KV Cache...")
         # Allocate KV Cache
         for layer in self.layers:
             layer.reset_kvcache(max_seq_len)
+        print("Prefilling...")
         # Prefill
         token = self._prefill(inputs)
         output = list(inputs)
@@ -144,7 +146,7 @@ class Qwen2:
         max_idx = Tensor(shape=(1,), dtype=DataType.I64, device=self.device)
         max_val = Tensor(shape=(1,), dtype=self.dtype, device=self.device)
         Ops.argmax(max_idx=max_idx, max_val=max_val, vals=logits_last_row)
-        return max_idx.scalar_val() # type: ignore
+        return max_idx.val() # type: ignore
     
     def _decode(self, token: int, pos: int) -> int:
         tensor_in = Tensor(shape=(1,), dtype=DataType.I64, device=self.device)
@@ -158,7 +160,7 @@ class Qwen2:
         max_idx = Tensor(shape=(1,), dtype=DataType.I64, device=self.device)
         max_val = Tensor(shape=(1,), dtype=self.dtype, device=self.device)
         Ops.argmax(max_idx=max_idx, max_val=max_val, vals=logits)
-        return max_idx.scalar_val() # type: ignore
+        return max_idx.val() # type: ignore
 
 
 @dataclasses.dataclass
@@ -297,7 +299,7 @@ class Qwen2Layer:
         # 输出投影
         debug(f"out...")
         out = Tensor(shape=(d_seq, d_emb), dtype=dtype, device=self.device)
-        Ops.linear(out=out, inp=scores, weight=self.o_proj_weight, bias=None)
+        Ops.linear(out=out, inp=scores, weight=self.o_proj_weight)
 
         return out
 
@@ -308,14 +310,14 @@ class Qwen2Layer:
         d_inter = self.gate_proj_weight.shape()[0] # type: ignore
 
         gate = Tensor(shape=(d_seq, d_inter), dtype=hidden_states.dtype(), device=self.device)
-        Ops.linear(out=gate, inp=hidden_states, weight=self.gate_proj_weight, bias=None)
+        Ops.linear(out=gate, inp=hidden_states, weight=self.gate_proj_weight)
         up = Tensor(shape=(d_seq, d_inter), dtype=hidden_states.dtype(), device=self.device)
-        Ops.linear(out=up, inp=hidden_states, weight=self.up_proj_weight, bias=None)
+        Ops.linear(out=up, inp=hidden_states, weight=self.up_proj_weight)
 
         swiglu_out = Tensor(shape=(d_seq, d_inter), dtype=hidden_states.dtype(), device=self.device)
         Ops.swiglu(out=swiglu_out, gate=gate, up=up)
 
         proj_out = Tensor(shape=(d_seq, d_emb), dtype=hidden_states.dtype(), device=self.device)
-        Ops.linear(out=proj_out, inp=swiglu_out, weight=self.down_proj_weight, bias=None)
+        Ops.linear(out=proj_out, inp=swiglu_out, weight=self.down_proj_weight)
 
         return proj_out

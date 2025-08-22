@@ -62,12 +62,12 @@ class Tensor:
     def data_ptr(self) -> c_void_p:
         return LIB_LLAISYS.tensorGetData(self._tensor)
     
-    def scalar_val(self):
-        if self.ndim() != 1 or self.shape()[0] != 1:
-            raise ValueError("Tensor is not a scalar")
-        
+    def val(self, i=0):
+        import math
+        if i>=math.prod(self.shape()):
+            raise ValueError("Out of bound")
         if self.device_type() != DeviceType.CPU:
-            raise ValueError("Scalar value can only be retrieved from CPU tensors")
+            raise ValueError("Value can only be retrieved from CPU tensors")
 
         from ctypes import c_int64, c_int32, c_float, POINTER, cast
 
@@ -76,13 +76,13 @@ class Tensor:
 
         if dtype == DataType.I64:
             int64_ptr = cast(ptr, POINTER(c_int64))
-            return int(int64_ptr.contents.value)
+            return int(int64_ptr[i])
         elif dtype == DataType.I32:
             int32_ptr = cast(ptr, POINTER(c_int32))
-            return int(int32_ptr.contents.value)
+            return int(int32_ptr[i])
         elif dtype == DataType.F32:
             float_ptr = cast(ptr, POINTER(c_float))
-            return float(float_ptr.contents.value)
+            return float(float_ptr[i])
         else:
             raise ValueError(f"Unsupported dtype: {dtype}")
 
