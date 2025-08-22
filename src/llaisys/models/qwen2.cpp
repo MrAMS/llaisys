@@ -238,7 +238,7 @@ __C {
             // 计算注意力分数
             DEBUG("scores");
             auto scores = Tensor::create({d_seq, head_q, d_v}, dtype, device, device_id);
-            llaisys::ops::self_attention(scores, q, k, v, 1.f/std::sqrt(d_qk));
+            llaisys::ops::self_attention(scores, q, k, v, 1.f/std::sqrt(d_qk*1.f));
             scores = scores->view({d_seq, head_q*d_v});
             
             // 输出投影
