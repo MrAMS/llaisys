@@ -180,9 +180,10 @@ class Qwen2:
             )
             print(f"Decode round {i}, token:", token, flush=True)
 
+            output.append(token)
+
             if token == self.eos_token_id:
                 break
 
-            output.append(token)
         
         return output
