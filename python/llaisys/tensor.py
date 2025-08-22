@@ -13,18 +13,18 @@ from ctypes import c_size_t, c_int, c_ssize_t, c_void_p
 class Tensor:
     def __init__(
         self,
-        shape: Sequence[int] | None = None,
+        shape: Sequence[int] = None,
         dtype: DataType = DataType.F32,
         device: DeviceType = DeviceType.CPU,
         device_id: int = 0,
-        tensor: llaisysTensor_t | None = None,
+        tensor: llaisysTensor_t = None,
     ):
         if tensor:
             self._tensor = tensor
         else:
             _ndim = 0 if shape is None else len(shape)
             _shape = None if shape is None else (c_size_t * len(shape))(*shape)
-            self._tensor: llaisysTensor_t | None = LIB_LLAISYS.tensorCreate(
+            self._tensor: llaisysTensor_t = LIB_LLAISYS.tensorCreate(
                 _shape,
                 c_size_t(_ndim),
                 llaisysDataType_t(dtype),
@@ -86,7 +86,7 @@ class Tensor:
         else:
             raise ValueError(f"Unsupported dtype: {dtype}")
 
-    def lib_tensor(self) -> llaisysTensor_t | None:
+    def lib_tensor(self) -> llaisysTensor_t:
         return self._tensor
 
     def debug(self):
@@ -115,7 +115,7 @@ class Tensor:
         _perm = (c_size_t * len(perm))(*perm)
         return Tensor(tensor=LIB_LLAISYS.tensorPermute(self._tensor, _perm))
 
-    def slice(self, dim: int, start: int, end: int|None = None):
+    def slice(self, dim: int, start: int, end: int = None):
         if dim < 0:
             dim += self.ndim()
         if start < 0:

@@ -19,7 +19,7 @@ class Ops:
         )
 
     @staticmethod
-    def linear(out: Tensor, inp: Tensor, weight: Tensor, bias: Tensor|None = None):
+    def linear(out: Tensor, inp: Tensor, weight: Tensor, bias: Tensor = None):
         if bias is None:
             bias = Tensor()
         LIB_LLAISYS.llaisysLinear(
