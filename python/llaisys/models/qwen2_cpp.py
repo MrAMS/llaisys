@@ -21,13 +21,6 @@ from huggingface_hub import snapshot_download
 class Qwen2:
 
     def __init__(self, model_path, device: DeviceType = DeviceType.CPU):
-        if model_path is not None and Path(model_path).exists():
-            print(f"Using local model path: {model_path}", flush=True)
-        else:
-            print("Model path not provided or does not exist. Downloading from Huggingface...", flush=True)
-            model_path = Path(snapshot_download("deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"))
-            print(f"Model downloaded to: {model_path}", flush=True)
-        
         model_path = Path(model_path)
         self.device = device
 
