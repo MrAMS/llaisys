@@ -8,6 +8,10 @@ void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
     CHECK_SAME_DTYPE(out->dtype(), in->dtype());
     CHECK_SAME_SHAPE(out->shape(), in->shape());
 
+    CHECK_ARGUMENT(out->ndim()==3, "ROPE: out must be a 3D tensor");
+    CHECK_ARGUMENT(in->ndim()==3, "ROPE: in must be a 3D tensor");
+    CHECK_ARGUMENT(pos_ids->ndim()==1, "ROPE: pos_ids must be a 1D tensor");
+
     CHECK_ARGUMENT(pos_ids->dtype()==llaisysDataType_t::LLAISYS_DTYPE_I64, "ROPE: pos_ids tensor dtype must be int64");
     CHECK_ARGUMENT(out->shape()==in->shape(), "ROPE: in and out tensor shape mismatch");
     CHECK_ARGUMENT(out->shape()[0]==pos_ids->shape()[0], "ROPE: pos_ids tensor shape mismatch");

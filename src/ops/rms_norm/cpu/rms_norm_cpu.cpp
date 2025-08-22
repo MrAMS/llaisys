@@ -12,13 +12,13 @@ void rms_norm_(T *out, const T *in, const T *weight, size_t m, size_t n, float e
         // 计算每行的RMS
         float rms_row = 0;
         for(size_t j=0;j<n;++j){
-            auto t = TOF(in[i*n+j]);
+            const float t = TOF(in[i*n+j]);
             rms_row += t*t;
         }
-        rms_row = std::sqrt(rms_row/n) + eps;
+        rms_row = std::sqrt(rms_row/n + eps);
         // 点乘W
         for(size_t j=0;j<n;++j){
-            out[i*n+j] = llaisys::utils::cast<T>(TOF(weight[j]) * TOF(in[i*n+j]) / rms_row);
+            out[i*n+j] = llaisys::utils::cast<T>(TOF(in[i*n+j]) / rms_row * TOF(weight[j]));
         }
     }
 }

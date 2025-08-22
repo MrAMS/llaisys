@@ -8,6 +8,7 @@ void embedding(tensor_t out, tensor_t index, tensor_t weight) {
     CHECK_SAME_DEVICE(out, index, weight);
     CHECK_ARGUMENT(index->dtype() == llaisysDataType_t::LLAISYS_DTYPE_I64, "Embedding: index must be of type int64.");
     CHECK_ARGUMENT(index->isContiguous(), "Embedding: index must be a contiguous tensor.");
+    CHECK_ARGUMENT(weight->isContiguous(), "Embedding: weight must be a contiguous tensor.");
 
     CHECK_ARGUMENT(index->ndim() == 1, "Embedding: index must be a 1D tensor for now.");
     CHECK_ARGUMENT(weight->ndim() == 2, "Embedding: weight must be a 2D tensor for now.");
@@ -18,7 +19,7 @@ void embedding(tensor_t out, tensor_t index, tensor_t weight) {
 
     switch (device_type) {
     case LLAISYS_DEVICE_CPU:
-        return cpu::embedding(out->data(), index->data(), index->ndim(), weight->data(), weight->shape(), weight->strides(), weight->dtype());
+        return cpu::embedding(out->data(), index->data(), index->numel(), weight->data(), weight->shape(), weight->dtype());
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
         TO_BE_IMPLEMENTED();

@@ -6,21 +6,16 @@
 
 template <typename T>
 void argmax_(int64_t *max_idx, T *max_val, const T *vals, size_t numel) {
-    *max_val = vals[0];
+    float max_val_f = llaisys::utils::cast<float>(vals[0]);
     *max_idx = 0;
-    for (size_t i = 0; i < numel; i++) {
-        if constexpr (std::is_same_v<T, llaisys::bf16_t> || std::is_same_v<T, llaisys::fp16_t>) {
-            if(llaisys::utils::cast<float>(vals[i]) > llaisys::utils::cast<float>(*max_val)){
-                *max_val = vals[i];
-                *max_idx = i;
-            }
-        } else {
-            if(vals[i] > *max_val){
-                *max_val = vals[i];
-                *max_idx = i;
-            }
+    for (size_t i = 1; i < numel; i++) {
+        const float t = llaisys::utils::cast<float>(vals[i]);
+        if(t > max_val_f){
+            max_val_f = t;
+            *max_idx = i;
         }
     }
+    *max_val = llaisys::utils::cast<T>(max_val_f);
 }
 
 namespace llaisys::ops::cpu {

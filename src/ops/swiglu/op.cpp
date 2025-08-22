@@ -8,6 +8,10 @@ void swiglu(tensor_t out, tensor_t gate, tensor_t up) {
     CHECK_SAME_DTYPE(out->dtype(), gate->dtype(), up->dtype());
     CHECK_SAME_SHAPE(out->shape(), gate->shape(), up->shape());
 
+    CHECK_ARGUMENT(out->ndim()==2, "SWIGLU: out must be a 2D tensor");
+    CHECK_ARGUMENT(gate->ndim()==2, "SWIGLU: gate must be a 2D tensor");
+    CHECK_ARGUMENT(up->ndim()==2, "SWIGLU: up must be a 2D tensor");
+
     CHECK_ARGUMENT(out->isContiguous(), "SWIGLU: out tensor must be contiguous");
     CHECK_ARGUMENT(gate->isContiguous(), "SWIGLU: gate tensor must be contiguous");
     CHECK_ARGUMENT(up->isContiguous(), "SWIGLU: up tensor must be contiguous");

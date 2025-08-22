@@ -29,7 +29,7 @@ void self_attention_(T *attn_val, const T *q, const T *k, const T *v,
                     attn_scores[j] *= scale;
                 }
                 // 计算Causal Softmax
-                const auto causal_len = std::min(s+1, d_tot);
+                const auto causal_len = std::min(d_tot-d_seq+s+1, d_tot);
                 float max_score = attn_scores[0];
                 for(size_t j=1;j<causal_len;++j){
                     if(attn_scores[j] > max_score){

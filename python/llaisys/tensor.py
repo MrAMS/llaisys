@@ -10,22 +10,21 @@ from .libllaisys import (
 )
 from ctypes import c_size_t, c_int, c_ssize_t, c_void_p
 
-
 class Tensor:
     def __init__(
         self,
-        shape: Sequence[int] = None,
+        shape: Sequence[int] | None = None,
         dtype: DataType = DataType.F32,
         device: DeviceType = DeviceType.CPU,
         device_id: int = 0,
-        tensor: llaisysTensor_t = None,
+        tensor: llaisysTensor_t | None = None,
     ):
         if tensor:
             self._tensor = tensor
         else:
             _ndim = 0 if shape is None else len(shape)
             _shape = None if shape is None else (c_size_t * len(shape))(*shape)
-            self._tensor: llaisysTensor_t = LIB_LLAISYS.tensorCreate(
+            self._tensor: llaisysTensor_t | None = LIB_LLAISYS.tensorCreate(
                 _shape,
                 c_size_t(_ndim),
                 llaisysDataType_t(dtype),
@@ -62,8 +61,32 @@ class Tensor:
 
     def data_ptr(self) -> c_void_p:
         return LIB_LLAISYS.tensorGetData(self._tensor)
+    
+    def scalar_val(self):
+        if self.ndim() != 1 or self.shape()[0] != 1:
+            raise ValueError("Tensor is not a scalar")
+        
+        if self.device_type() != DeviceType.CPU:
+            raise ValueError("Scalar value can only be retrieved from CPU tensors")
 
-    def lib_tensor(self) -> llaisysTensor_t:
+        from ctypes import c_int64, c_int32, c_float, POINTER, cast
+
+        ptr = self.data_ptr()
+        dtype = self.dtype()
+
+        if dtype == DataType.I64:
+            int64_ptr = cast(ptr, POINTER(c_int64))
+            return int(int64_ptr.contents.value)
+        elif dtype == DataType.I32:
+            int32_ptr = cast(ptr, POINTER(c_int32))
+            return int(int32_ptr.contents.value)
+        elif dtype == DataType.F32:
+            float_ptr = cast(ptr, POINTER(c_float))
+            return float(float_ptr.contents.value)
+        else:
+            raise ValueError(f"Unsupported dtype: {dtype}")
+
+    def lib_tensor(self) -> llaisysTensor_t | None:
         return self._tensor
 
     def debug(self):
@@ -75,21 +98,30 @@ class Tensor:
     def load(self, data: c_void_p):
         LIB_LLAISYS.tensorLoad(self._tensor, data)
 
+    def load_np(self, data):
+        self.load(data.ctypes.data_as(c_void_p))
+
     def is_contiguous(self) -> bool:
         return bool(LIB_LLAISYS.tensorIsContiguous(self._tensor))
 
-    def view(self, *shape: int) -> llaisysTensor_t:
+    def view(self, *shape: int):
         _shape = (c_size_t * len(shape))(*shape)
         return Tensor(
             tensor=LIB_LLAISYS.tensorView(self._tensor, _shape, c_size_t(len(shape)))
         )
 
-    def permute(self, *perm: int) -> llaisysTensor_t:
+    def permute(self, *perm: int):
         assert len(perm) == self.ndim()
         _perm = (c_size_t * len(perm))(*perm)
         return Tensor(tensor=LIB_LLAISYS.tensorPermute(self._tensor, _perm))
 
-    def slice(self, dim: int, start: int, end: int):
+    def slice(self, dim: int, start: int, end: int|None = None):
+        if dim < 0:
+            dim += self.ndim()
+        if start < 0:
+            start += self.shape()[dim]
+        if end is None:
+            end = self.shape()[dim]
         return Tensor(
             tensor=LIB_LLAISYS.tensorSlice(
                 self._tensor, c_size_t(dim), c_size_t(start), c_size_t(end)

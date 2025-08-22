@@ -35,6 +35,48 @@ class DataType(IntEnum):
     C128 = 18
     BF16 = 19
 
+    @classmethod
+    def from_safetensors(cls, dtype: str) -> "DataType":
+        if dtype == "F64":
+            return cls.F64
+        elif dtype == "F32":
+            return cls.F32
+        elif dtype == "F16":
+            return cls.F16
+        elif dtype == "BF16":
+            return cls.BF16
+        elif dtype == "I64":
+            return cls.I64
+        elif dtype == "I32":
+            return cls.I32
+        elif dtype == "I16":
+            return cls.I16
+        elif dtype == "I8":
+            return cls.I8
+        elif dtype == "BOOL":
+            return cls.BOOL
+        else:
+            raise ValueError(f"Unsupported safetensors dtype: {dtype}")
+        
+    @classmethod
+    def from_torch_dtype(cls, dtype) -> "DataType":
+        import torch
+        if dtype == torch.bfloat16:
+            return cls.BF16
+        elif dtype == torch.float32:
+            return cls.F32
+        else:
+            raise ValueError(f"Unsupported safetensors dtype: {dtype}")
+        
+    @classmethod
+    def from_config_json(cls, dtype: str) -> "DataType":
+        import torch
+        if dtype == "bfloat16":
+            return cls.BF16
+        else:
+            raise ValueError(f"Unsupported safetensors dtype: {dtype}")
+
+
 
 llaisysDataType_t = ctypes.c_int
 

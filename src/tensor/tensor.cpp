@@ -15,6 +15,7 @@ Tensor::Tensor(TensorMeta meta, core::storage_t storage, size_t offset)
 tensor_t Tensor::create(const std::vector<size_t> &shape,
                         llaisysDataType_t dtype,
                         llaisysDeviceType_t device_type,
+                        size_t offset,
                         int device) {
     size_t ndim_ = shape.size();
     // 张量每个维度上坐标 +1 时,数据指针跨过的范围,一个 2x3x4 张量,其strides为 [3*4*1, 4*1, 1]
@@ -30,11 +31,11 @@ tensor_t Tensor::create(const std::vector<size_t> &shape,
 
     if (device_type == LLAISYS_DEVICE_CPU && core::context().runtime().deviceType() != LLAISYS_DEVICE_CPU) {
         auto storage = core::context().runtime().allocateHostStorage(total_elems * dtype_size);
-        return std::shared_ptr<Tensor>(new Tensor(meta, storage));
+        return std::shared_ptr<Tensor>(new Tensor(meta, storage, offset));
     } else {
         core::context().setDevice(device_type, device);
         auto storage = core::context().runtime().allocateDeviceStorage(total_elems * dtype_size);
-        return std::shared_ptr<Tensor>(new Tensor(meta, storage));
+        return std::shared_ptr<Tensor>(new Tensor(meta, storage, offset));
     }
 }
 
@@ -98,18 +99,32 @@ std::string Tensor::info() const {
 template <typename T>
 void print_data(const T *data, const std::vector<size_t> &shape, const std::vector<ptrdiff_t> &strides, size_t dim) {
     if (dim == shape.size() - 1) {
-        for (size_t i = 0; i < shape[dim]; i++) {
-            if constexpr (std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t>) {
-                std::cout << utils::cast<float>(data[i * strides[dim]]) << " ";
-            } else {
-                std::cout << data[i * strides[dim]] << " ";
+        std::cout << "[";
+        auto const max_line = 6;
+        auto print_line = [&](size_t start, size_t end) {
+            for (size_t i = start; i < end; i++) {
+                if constexpr (std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t>) {
+                    std::cout << utils::cast<float>(data[i * strides[dim]]) << " ";
+                } else {
+                    std::cout << data[i * strides[dim]] << " ";
+                }
             }
+        };
+        if(shape[dim]<=max_line){
+            print_line(0, shape[dim]);
+        }else{
+            print_line(0, max_line/2);
+            std::cout << "... ";
+            print_line(shape[dim]-max_line/2, shape[dim]);
         }
+        std::cout << "]";
         std::cout << std::endl;
     } else if (dim < shape.size() - 1) {
+        std::cout << "["<< std::endl;
         for (size_t i = 0; i < shape[dim]; i++) {
             print_data(data + i * strides[dim], shape, strides, dim + 1);
         }
+        std::cout << "]"<< std::endl;
     }
 }
 
@@ -183,7 +198,7 @@ tensor_t Tensor::permute(const std::vector<size_t> &order) const {
         new_meta.shape[i] = _meta.shape[order[i]];
         new_meta.strides[i] = _meta.strides[order[i]];
     }
-    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage));
+    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage, _offset));
 }
 
 tensor_t Tensor::view(const std::vector<size_t> &shape) const {
@@ -199,8 +214,9 @@ tensor_t Tensor::view(const std::vector<size_t> &shape) const {
         new_meta.strides[idx] = new_stride;
         new_stride *= shape[idx];
     }
+    new_meta.shape = shape;
     CHECK_ARGUMENT(numel() == new_stride, "Cannot view tensor to a different number of elements.");
-    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage));
+    return std::shared_ptr<Tensor>(new Tensor(new_meta, _storage, _offset));
 }
 
 tensor_t Tensor::slice(size_t dim, size_t start, size_t end) const {
@@ -244,17 +260,17 @@ void Tensor::load(const void *src_) {
 
 tensor_t Tensor::contiguous() const {
     TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage, _offset));
 }
 
 tensor_t Tensor::reshape(const std::vector<size_t> &shape) const {
     TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage, _offset));
 }
 
 tensor_t Tensor::to(llaisysDeviceType_t device_type, int device) const {
     TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage, _offset));
 }
 
 } // namespace llaisys

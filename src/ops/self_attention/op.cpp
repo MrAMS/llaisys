@@ -13,6 +13,11 @@ void self_attention(tensor_t attn_val, tensor_t q, tensor_t k, tensor_t v, float
     const auto d_kvhead = k->shape()[1];
     const auto d_tot = k->shape()[0];
 
+    CHECK_ARGUMENT(q->ndim()==3, "SELF_ATTEN: q must be a 3D tensor");
+    CHECK_ARGUMENT(k->ndim()==3, "SELF_ATTEN: k must be a 3D tensor");
+    CHECK_ARGUMENT(v->ndim()==3, "SELF_ATTEN: v must be a 3D tensor");
+    CHECK_ARGUMENT(attn_val->ndim()==3, "SELF_ATTEN: attn_val must be a 3D tensor");
+
     CHECK_ARGUMENT(q->shape()[0]==d_seq&&q->shape()[1]==d_head, "SELF_ATTEN: q tensor shape mismatch");
     CHECK_ARGUMENT(k->shape()[0]==d_tot&&k->shape()[1]==d_kvhead&&k->shape()[2]==d_qk, "SELF_ATTEN: k tensor shape mismatch");
     CHECK_ARGUMENT(v->shape()[0]==d_tot&&v->shape()[1]==d_kvhead&&v->shape()[2]==d_v, "SELF_ATTEN: v tensor shape mismatch");

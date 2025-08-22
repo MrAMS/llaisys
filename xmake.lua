@@ -3,6 +3,8 @@ set_encodings("utf-8")
 
 add_includedirs("include")
 
+-- set_policy("build.sanitizer.address", true)
+
 -- CPU --
 includes("xmake/cpu.lua")
 
