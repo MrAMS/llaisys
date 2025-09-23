@@ -14,7 +14,11 @@ class LlaisysQwen2Meta(ctypes.Structure):
         ("voc", ctypes.c_size_t),
         ("epsilon", ctypes.c_float),
         ("theta", ctypes.c_float),
-        ("end_token", ctypes.c_int64)
+        ("end_token", ctypes.c_int64),
+
+        ("max_running_seqs", ctypes.c_uint64),
+        ("block_num", ctypes.c_uint64),
+        ("block_size", ctypes.c_uint64),
     ]
 
 class LlaisysQwen2Weights(ctypes.Structure):
@@ -45,9 +49,10 @@ class LlaisysQwen2Model(ctypes.Structure):
         ("ndevice", ctypes.c_int),
         ("device_ids", ctypes.POINTER(ctypes.c_int)),
         ("weights", ctypes.POINTER(LlaisysQwen2Weights)),
-        ("k_caches",    ctypes.POINTER(llaisysTensor_t)),
-        ("v_caches",    ctypes.POINTER(llaisysTensor_t)),
-        ("kv_cached_row", ctypes.POINTER(ctypes.c_size_t)),
+
+        ("scheduler", ctypes.c_void_p),
+        ("seq_n", ctypes.c_int64),
+        ("sampler", ctypes.c_void_p),
     ]
 
 def load_qwen2_cpp(lib):
@@ -61,9 +66,15 @@ def load_qwen2_cpp(lib):
     lib.llaisysQwen2ModelWeights.argtypes = [ctypes.POINTER(LlaisysQwen2Model)]
     lib.llaisysQwen2ModelWeights.restype = ctypes.POINTER(LlaisysQwen2Weights)
 
-    lib.llaisysQwen2ModelAllocKVCache.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.c_size_t]
-    lib.llaisysQwen2ModelAllocKVCache.restype = None
+    # lib.llaisysQwen2ModelAllocKVCache.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.c_size_t]
+    # lib.llaisysQwen2ModelAllocKVCache.restype = None
 
     # __export int64_t llaisysQwen2ModelInfer(struct LlaisysQwen2Model * model, int64_t * token_ids, size_t ntoken);
-    lib.llaisysQwen2ModelInfer.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t]
-    lib.llaisysQwen2ModelInfer.restype = ctypes.c_int64
+    # lib.llaisysQwen2ModelInfer.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t]
+    # lib.llaisysQwen2ModelInfer.restype = ctypes.c_int64
+
+    lib.llaisysQwen2SchedulerAdd.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.c_uint64, ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t]
+    lib.llaisysQwen2SchedulerAdd.restype = None
+
+    lib.llaisysQwen2SchedulerStep.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_int64)]
+    lib.llaisysQwen2SchedulerStep.restype = ctypes.c_bool

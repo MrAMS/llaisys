@@ -3,9 +3,12 @@
 #include "llaisys/ops.h"
 #include "llaisys/tensor.h"
 #include "../llaisys_tensor.hpp"
+#include "../../paged_cache/paged_cache.hpp"
 
 #include "../../ops/ops.hpp"
+#include "../../sampler/sampler.hpp"
 
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +22,7 @@
 #include <cstdlib>
 #define DEBUG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define DEBUG_TENSOR(X) X->debug()
+// #define DEBUG_TENSOR(X)
 #else
 #define DEBUG(fmt, ...) 
 #define DEBUG_TENSOR(X)
@@ -27,9 +31,6 @@
 __C {
     struct LlaisysQwen2Model *llaisysQwen2ModelCreate(const LlaisysQwen2Meta *meta, llaisysDeviceType_t device, int *device_ids, int ndevice){
         auto model = new LlaisysQwen2Model;
-        model->kv_cached_row = 0;
-        model->k_caches = nullptr;
-        model->v_caches = nullptr;
 
         model->meta = new LlaisysQwen2Meta(*meta);
 
@@ -76,7 +77,11 @@ __C {
         // Output Embedding
         alloc_weight(model->weights->out_embed, { meta->voc, meta->hs });
 
-
+        model->scheduler = new llaisys::PagedCache::Scheduler(meta->max_running_seqs,
+            meta->nlayer,
+            meta->block_num, meta->block_size,
+            meta->nkvh*meta->dh*llaisys::utils::dsize(meta->dtype),
+            device, device_ids[0]);
         return model;
     }
 
@@ -102,10 +107,7 @@ __C {
         
         delete model->weights;
 
-        if(model->k_caches)
-            delete [] model->k_caches;
-        if(model->v_caches)
-            delete [] model->v_caches;
+        delete (llaisys::PagedCache::Scheduler*) model->scheduler;
 
         delete [] model->device_ids;
         delete model;
@@ -115,37 +117,16 @@ __C {
         return model->weights;
     }
 
-    void llaisysQwen2ModelAllocKVCache(struct LlaisysQwen2Model * model, size_t max_seq_len){
-        if(!model) return;
-
-        if(model->k_caches)
-            delete [] model->k_caches;
-        if(model->v_caches)
-            delete [] model->v_caches;
-
-        model->kv_cached_row = 0;
-
-        auto alloc_kvcache = [&](llaisysTensor_t* &ptr, std::vector<size_t> shape){
-            ptr = new llaisysTensor_t[model->meta->nlayer];
-            for (size_t i = 0; i < model->meta->nlayer; ++i) {
-                ptr[i] = tensorCreate(shape.data(), shape.size(), model->meta->dtype, model->device, model->device_ids[0]);
-            }
-        };
-
-        alloc_kvcache(model->k_caches, {max_seq_len, model->meta->nkvh*model->meta->dh});
-        alloc_kvcache(model->v_caches, {max_seq_len, model->meta->nkvh*model->meta->dh});
-    }
-
-    int64_t llaisysQwen2ModelInfer(struct LlaisysQwen2Model * model, int64_t * token_ids, size_t ntoken){
+    static llaisys::tensor_t run_model(struct LlaisysQwen2Model * model, llaisys::PagedCache::Sequence* seq, bool is_prefill){
         // google::InstallFailureSignalHandler();
 
-        if(!model || !token_ids || ntoken == 0 || !model->k_caches || !model->v_caches){
-            return -1; // Invalid model or input
+        if(!model){
+            return llaisys::Tensor::create_none(); // Invalid model or input
         }
         using llaisys::Tensor;
 
-        const auto d_seq = ntoken;
-        const auto d_cached = model->kv_cached_row;
+        const auto d_seq = is_prefill ? (seq->num_tokens()-seq->num_cached()) : 1;
+        // const auto d_cached = model->kv_cached_row;
         const auto dtype = model->meta->dtype;
         const auto device = model->device;
         const auto device_id = model->device_ids[0];
@@ -156,13 +137,15 @@ __C {
         const auto none = Tensor::create_none();
 
         auto inputs = Tensor::create({d_seq}, llaisysDataType_t::LLAISYS_DTYPE_I64, device, device_id);
-        inputs->load(token_ids);
+        inputs->load(seq->tokens_ptr(seq->num_tokens()-d_seq));
 
         auto pos = Tensor::create({d_seq}, llaisysDataType_t::LLAISYS_DTYPE_I64, device, device_id);
         for(size_t i=0;i<d_seq;++i){
             auto ptr = (int64_t*)(pos->data());
-            ptr[i] = d_cached + i;
+            // ptr[i] = d_cached + i;
+            ptr[i] = seq->num_tokens()-(d_seq-i);
         }
+
         //
         // Input Embedding
         //
@@ -187,15 +170,14 @@ __C {
             const auto v_proj_w = model->weights->attn_v_w[layer]->tensor;
             const auto v_proj_b = model->weights->attn_v_b[layer]->tensor;
             const auto o_proj_w = model->weights->attn_o_w[layer]->tensor;
-
-            auto k_cache = model->k_caches[layer]->tensor;
-            auto v_cache = model->v_caches[layer]->tensor;
-            const auto kv_cached_row = model->kv_cached_row;
             
             const auto head_kv = model->meta->nkvh;
             const auto head_q = model->meta->nh;
             const auto d_qk = k_proj_w->shape()[0]/head_kv;
             const auto d_v = v_proj_w->shape()[0]/head_kv;
+
+            const auto slot_mapping_k = seq->get_slot_mapping(layer, false);
+            const auto slot_mapping_v = seq->get_slot_mapping(layer, true);
 
             // 输入归一化
             DEBUG("rms_norm");
@@ -214,31 +196,39 @@ __C {
 
             // 只投影K新的部分
             DEBUG("K");
-            auto k_new = k_cache->slice(0, kv_cached_row, kv_cached_row+d_seq);
-            llaisys::ops::linear(k_new, atten_norm, k_proj_w, k_proj_b);
-            k_new = k_new->view({d_seq, head_kv, d_qk});
+            std::vector<std::byte*> k_new;
+            for(size_t i=slot_mapping_k.size()-d_seq;i<slot_mapping_k.size();++i) k_new.push_back(slot_mapping_k[i]);
+            llaisys::ops::linear_paged(k_new.data(), atten_norm, k_proj_w, k_proj_b);
             // 位置编码
-            llaisys::ops::rope(k_new, k_new, pos, rope_theta);
-            DEBUG_TENSOR(k_new);
+            llaisys::ops::rope_paged(k_new.data(), k_new.data(), pos, d_seq, head_kv, d_qk, hidden_states->dtype(), rope_theta);
+            // DEBUG_TENSOR(k_new);
 
             // 只投影V新的部分
             DEBUG("V");
-            auto v_new = v_cache->slice(0, kv_cached_row, kv_cached_row+d_seq);
-            llaisys::ops::linear(v_new, atten_norm, v_proj_w, v_proj_b);
-            v_new = v_new->view({d_seq, head_kv, d_v});
-            DEBUG_TENSOR(v_new);
+            std::vector<std::byte*> v_new;
+            for(size_t i=slot_mapping_v.size()-d_seq;i<slot_mapping_v.size();++i) v_new.push_back(slot_mapping_v[i]);
+            llaisys::ops::linear_paged(v_new.data(), atten_norm, v_proj_w, v_proj_b);
+            // DEBUG_TENSOR(v_new);
 
             // 从KV Cache中获取完整的K和V
-            auto k = k_cache->slice(0, 0, kv_cached_row+d_seq);
-            k = k->view({kv_cached_row+d_seq, head_kv, d_qk});
-
-            auto v = v_cache->slice(0, 0, kv_cached_row+d_seq);
-            v = v->view({kv_cached_row+d_seq, head_kv, d_v});
+            printf("kcache: ");
+            std::vector<std::byte*> k;
+            for(size_t i=0;i<slot_mapping_k.size();++i){
+                k.push_back(slot_mapping_k[i]);
+                printf("%lx ", (size_t)slot_mapping_k[i]);
+            }
+            printf("\nvcache:");
+            std::vector<std::byte*> v;
+            for(size_t i=0;i<slot_mapping_v.size();++i){
+                v.push_back(slot_mapping_v[i]);
+                printf("%lx ", (size_t)slot_mapping_v[i]);
+            }
+            printf("\n");
 
             // 计算注意力分数
             DEBUG("scores");
             auto scores = Tensor::create({d_seq, head_q, d_v}, dtype, device, device_id);
-            llaisys::ops::self_attention(scores, q, k, v, 1.f/std::sqrt(d_qk*1.f));
+            llaisys::ops::self_attention_paged(scores, q, k.data(), v.data(), head_kv, d_seq, 1.f/std::sqrt(d_qk*1.f));
             scores = scores->view({d_seq, head_q*d_v});
             
             // 输出投影
@@ -293,9 +283,6 @@ __C {
             DEBUG_TENSOR(hidden_states);
         }
 
-        // 更新KV Cache
-        model->kv_cached_row += d_seq;
-
         //
         // rms_norm
         //
@@ -312,14 +299,46 @@ __C {
         
         llaisys::ops::linear(logits, hidden_states, lm_head_w, none);
 
+
         //
         // 
         //
         auto logits_last_row = logits->slice(0, logits->shape()[0]-1, logits->shape()[0])->view({logits->shape()[1]});
-        auto max_idx = Tensor::create({1}, llaisysDataType_t::LLAISYS_DTYPE_I64, device, device_id);
-        auto max_val = Tensor::create({1}, dtype, device, device_id);
-        llaisys::ops::argmax(max_idx, max_val, logits_last_row);
+        return logits_last_row;
 
-        return *((int64_t*)max_idx->data()); 
+        // auto max_idx = Tensor::create({1}, llaisysDataType_t::LLAISYS_DTYPE_I64, device, device_id);
+        // auto max_val = Tensor::create({1}, dtype, device, device_id);
+        // llaisys::ops::argmax(max_idx, max_val, logits_last_row);
+
+        // return *((int64_t*)max_idx->data()); 
     }
+
+    void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken){
+        auto scheduler = (llaisys::PagedCache::Scheduler*)(model->scheduler);
+        scheduler->add(seq_id, std::vector<llaisys::PagedCache::token_t>(token_ids, token_ids+ntoken), model->meta->end_token);
+    }
+
+    bool llaisysQwen2SchedulerStep(struct LlaisysQwen2Model * model, uint64_t* nseq, uint64_t* seq_len, uint64_t* seq_ids, int64_t* token_ids){
+        auto scheduler = (llaisys::PagedCache::Scheduler*)(model->scheduler);
+        auto sampler = llaisys::sampler::SamplerArgmax();
+        auto [seqs, is_prefill] = scheduler->schedule();
+        *nseq = seqs.size();
+        printf("nseq=%ld\n", *nseq);
+        for(size_t i=0;i<seqs.size();++i){
+            auto seq = seqs[i];
+            for(size_t i=0;i<seq->num_tokens();++i)
+                printf("%ld ", *(seq->tokens_ptr()+i));
+            printf("\n");
+            llaisys::tensor_t logits= run_model(model, seq, is_prefill);
+            const auto new_token = sampler.sample(logits);
+
+            seq_len[i] = 1;
+            seq_ids[i] = seq->get_id();
+            *(token_ids++) = new_token;
+            
+            scheduler->postprocess(seq, new_token);
+        }
+        return scheduler->is_finished();
+    }
+
 }

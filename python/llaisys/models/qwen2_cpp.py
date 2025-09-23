@@ -18,6 +18,12 @@ load_qwen2_cpp(LIB_LLAISYS)
 
 from huggingface_hub import snapshot_download
 
+max_finished_seqs = 0
+max_running_seqs = 1
+
+block_num = 6
+block_size = 16
+
 class Qwen2:
 
     def __init__(self, model_path, device: DeviceType = DeviceType.CPU):
@@ -72,7 +78,11 @@ class Qwen2:
             voc=self.vocab_size,
             epsilon=self.rms_norm_eps,
             theta=self.rope_theta,
-            end_token=self.eos_token_id
+            end_token=self.eos_token_id,
+            max_running_seqs=max_running_seqs,
+            max_finished_seqs=max_finished_seqs,
+            block_num=block_num,
+            block_size=block_size,
         )
 
         device_ids = (ctypes.c_int * 1)(0)
@@ -139,12 +149,11 @@ class Qwen2:
 
     def generate(
         self,
-        inputs: Sequence[int],
+        inputs: Sequence[int], # 支持批次
         max_new_tokens: int = 128,
         top_k: int = 1,
         top_p: float = 0.8,
         temperature: float = 0.8,
-        new_session: bool = True
     ):
         if self.model is None:
             raise RuntimeError("Model is null")
@@ -153,37 +162,36 @@ class Qwen2:
 
         prefill_len = len(inputs)
         max_seq_len = prefill_len + max_new_tokens
-        
-        if new_session:
-            print("Allocate KV Cache...", flush=True)
-            # Allocate KV Cache
-            LIB_LLAISYS.llaisysQwen2ModelAllocKVCache(self.model, ctypes.c_size_t(max_seq_len))
 
-        print("Prefilling...", flush=True)
-        # Prefill
-        token = LIB_LLAISYS.llaisysQwen2ModelInfer(
-            self.model,
+        LIB_LLAISYS.llaisysQwen2SchedulerAdd(self.model, 
+            ctypes.c_uint64(0),
             ctypes.cast((ctypes.c_int64 * prefill_len)(*inputs), ctypes.POINTER(ctypes.c_int64)),
-            ctypes.c_size_t(prefill_len),
+            ctypes.c_size_t(prefill_len)
         )
 
-        output.append(token)
+        print("Generating...", flush=True)
 
-        print(f"Prefill Done, output {token}", flush=True)
+        for i in range(1+max_new_tokens):
+            nseq = (ctypes.c_uint64 * max_running_seqs)()
+            seq_len = (ctypes.c_uint64 * max_running_seqs)()
+            seq_ids = (ctypes.c_uint64 * max_running_seqs)()
+            token_ids = (ctypes.c_int64 * max_running_seqs)()
 
-        # Decoding
-        for i in range(max_new_tokens):
-            token = LIB_LLAISYS.llaisysQwen2ModelInfer(
+
+            finished = LIB_LLAISYS.llaisysQwen2SchedulerStep(
                 self.model,
-                ctypes.cast((ctypes.c_int64 * 1)(token), ctypes.POINTER(ctypes.c_int64)),
-                ctypes.c_size_t(1),
+                nseq, seq_len, seq_ids, token_ids
             )
-            print(f"Decode round {i}, token:", token, flush=True)
 
-            output.append(token)
-
-            if token == self.eos_token_id:
+            if finished:
                 break
+            
+            assert(seq_len[0] == 1)
+            new_token = token_ids[0]
+
+            print(f"Round {i}, token:", new_token, flush=True)
+
+            output.append(new_token)
 
         
         return output

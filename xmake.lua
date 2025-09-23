@@ -7,6 +7,8 @@ add_includedirs("include")
 -- set_symbols("debug")
 add_rules("plugin.compile_commands.autoupdate")
 
+add_requires("xxhash")
+
 -- CPU --
 includes("xmake/cpu.lua")
 
@@ -99,6 +101,36 @@ target("llaisys-ops")
     on_install(function (target) end)
 target_end()
 
+target("llaisys-sampler")
+    set_kind("static")
+    add_deps("llaisys-sampler-cpu")
+
+    set_languages("cxx17")
+    set_warnings("all", "error")
+    if not is_plat("windows") then
+        add_cxflags("-fPIC", "-Wno-unknown-pragmas")
+    end
+    
+    add_files("src/sampler/*/*.cpp")
+
+    on_install(function (target) end)
+target_end()
+
+target("llaisys-paged_cache")
+    set_kind("static")
+
+    set_languages("cxx17")
+    set_warnings("all", "error")
+    if not is_plat("windows") then
+        add_cxflags("-fPIC", "-Wno-unknown-pragmas")
+    end
+    
+    add_files("src/paged_cache/*.cpp")
+    add_packages("xxhash")
+
+    on_install(function (target) end)
+target_end()
+
 target("llaisys")
     set_kind("shared")
     add_deps("llaisys-utils")
@@ -106,6 +138,8 @@ target("llaisys")
     add_deps("llaisys-core")
     add_deps("llaisys-tensor")
     add_deps("llaisys-ops")
+    add_deps("llaisys-sampler")
+    add_deps("llaisys-paged_cache")
 
     set_languages("cxx17")
     set_warnings("all", "error")

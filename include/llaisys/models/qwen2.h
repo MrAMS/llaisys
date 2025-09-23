@@ -17,6 +17,10 @@ __C {
         float epsilon; // rms_norm_eps
         float theta; // rope_theta
         int64_t end_token; // eos_token_id
+
+        uint64_t max_running_seqs;
+        uint64_t block_num;
+        uint64_t block_size;
     };
 
     struct LlaisysQwen2Weights {
@@ -43,9 +47,7 @@ __C {
         size_t ndevice;
         const LlaisysQwen2Meta *meta;
         struct LlaisysQwen2Weights* weights;
-        llaisysTensor_t* k_caches;
-        llaisysTensor_t* v_caches;
-        size_t kv_cached_row; // tot_seq_len
+        void* scheduler;
     };
 
     __export struct LlaisysQwen2Model *llaisysQwen2ModelCreate(const LlaisysQwen2Meta *meta, llaisysDeviceType_t device, int *device_ids, int ndevice);
@@ -54,8 +56,8 @@ __C {
 
     __export struct LlaisysQwen2Weights *llaisysQwen2ModelWeights(struct LlaisysQwen2Model * model);
 
-    __export void llaisysQwen2ModelAllocKVCache(struct LlaisysQwen2Model * model, size_t max_seq_len);
+    __export void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken);
 
-    __export int64_t llaisysQwen2ModelInfer(struct LlaisysQwen2Model * model, int64_t * token_ids, size_t ntoken);
+    __export bool llaisysQwen2SchedulerStep(struct LlaisysQwen2Model * model, uint64_t* nseq, uint64_t* seq_len, uint64_t* seq_ids, int64_t* token_ids);
 }
 #endif // LLAISYS_MODELS_QWEN2_H
