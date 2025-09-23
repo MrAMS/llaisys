@@ -9,6 +9,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <inttypes.h>
 
 #define DEBUG_ON 1
 #if DEBUG_ON
@@ -58,7 +59,7 @@ namespace PagedCache {
     }
 
     uint64_t BlockManager::allocate_block(uint64_t hash){
-        auto id = free_block_ids.front();
+        uint64_t id = free_block_ids.front();
         ASSERT_(blocks[id].ref_count == 0);
         blocks[id].reset();
         blocks[id].update(hash);
@@ -67,7 +68,7 @@ namespace PagedCache {
         if(hash!=invalid_hash){
             hash2id[hash]=id;
         }
-        DEBUG("allocate block (id=%ld)", id);
+        DEBUG("allocate block (id=%" PRId64 ")", id);
         return id;
     }
     void BlockManager::deallocate_block(uint64_t block_id){
@@ -77,7 +78,7 @@ namespace PagedCache {
         if(blocks[block_id].hash != invalid_hash){
             hash2id.erase(blocks[block_id].hash);
         }
-        DEBUG("deallocate block (id=%ld)", block_id);
+        DEBUG("deallocate block (id=%" PRId64 ")", block_id);
     }
 
     void BlockManager::add_ref_block(uint64_t block_id){
@@ -94,7 +95,7 @@ namespace PagedCache {
     }
 
     std::byte* BlockManager::data(uint64_t layer_i, bool is_v, uint64_t block_id, uint64_t token_i){
-        return _storage->memory() + layer_i*(2*_block_n*_block_sz*_token_sz) + is_v*(_block_n*_block_sz*_token_sz) + block_id*(_block_sz*_token_sz) + token_i*_token_sz;
+        return _storage->memory() + layer_i*(2*_block_n*_block_sz*_token_sz) + uint64_t(is_v)*(_block_n*_block_sz*_token_sz) + block_id*(_block_sz*_token_sz) + token_i*_token_sz;
     }
 
     std::pair<bool, uint64_t> BlockManager::find_block(uint64_t hash) const{
@@ -200,7 +201,7 @@ namespace PagedCache {
     }
 
     bool Sequence::can_append() const{
-        return _manager->free_blocks() >= need_new_block();
+        return _manager->free_blocks() >= (uint64_t)need_new_block();
     }
 
     void Sequence::may_append(){
@@ -260,9 +261,9 @@ namespace PagedCache {
             Sequence seq = waiting.front();
             bool allocated = true;
             while(!seq.allocate()){
-                printf("seq%ld cannot prefill more\n", seq.get_id());
+                printf("seq%" PRId64 " cannot prefill more\n", seq.get_id());
                 if(!finished.empty()){
-                    printf("try to deallocate finished seq%ld\n", finished.front().get_id());
+                    printf("try to deallocate finished seq%" PRId64 "\n", finished.front().get_id());
                     finished.front().deallocate();
                     finished.pop_front();
                 }else{
@@ -287,17 +288,17 @@ namespace PagedCache {
             Sequence seq = running.front();
             running.pop_front();
             if(seq.is_finished()){
-                printf("seq%ld finished\n", seq.get_id());
+                printf("seq%" PRId64 " finished\n", seq.get_id());
                 continue;
             }
             while(!seq.can_append()){
-                printf("seq%ld cannot decode more\n", seq.get_id());
+                printf("seq%" PRId64 " cannot decode more\n", seq.get_id());
                 if(!finished.empty()){
-                    printf("try to deallocate finished seq%ld\n", finished.front().get_id());
+                    printf("try to deallocate finished seq%" PRId64 "\n", finished.front().get_id());
                     finished.front().deallocate();
                     finished.pop_front();
                 }else if(!running.empty()){
-                    printf("try to deallocate running seq%ld\n", running.back().get_id());
+                    printf("try to deallocate running seq%" PRId64 "\n", running.back().get_id());
                     preempt(running.back());  // 释放队尾的seq来满足新来的seq（调度策略:后进先出）
                     running.pop_back();
                 }else{
