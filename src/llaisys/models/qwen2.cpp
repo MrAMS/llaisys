@@ -304,9 +304,9 @@ __C {
         // return *((int64_t*)max_idx->data()); 
     }
 
-    void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken){
+    void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken, uint64_t max_tokens){
         auto scheduler = (llaisys::PagedCache::Scheduler*)(model->scheduler);
-        scheduler->add(seq_id, std::vector<llaisys::PagedCache::token_t>(token_ids, token_ids+ntoken), model->meta->end_token);
+        scheduler->add(seq_id, std::vector<llaisys::PagedCache::token_t>(token_ids, token_ids+ntoken), model->meta->end_token, max_tokens);
     }
 
     bool llaisysQwen2SchedulerStep(struct LlaisysQwen2Model * model, uint64_t* nseq, uint64_t* seq_len, uint64_t* seq_ids, int64_t* token_ids){

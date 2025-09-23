@@ -73,7 +73,7 @@ def load_qwen2_cpp(lib):
     # lib.llaisysQwen2ModelInfer.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t]
     # lib.llaisysQwen2ModelInfer.restype = ctypes.c_int64
 
-    lib.llaisysQwen2SchedulerAdd.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.c_uint64, ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t]
+    lib.llaisysQwen2SchedulerAdd.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.c_uint64, ctypes.POINTER(ctypes.c_int64), ctypes.c_size_t, ctypes.c_uint64]
     lib.llaisysQwen2SchedulerAdd.restype = None
 
     lib.llaisysQwen2SchedulerStep.argtypes = [ctypes.POINTER(LlaisysQwen2Model), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_int64)]

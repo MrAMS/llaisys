@@ -19,10 +19,10 @@ load_qwen2_cpp(LIB_LLAISYS)
 from huggingface_hub import snapshot_download
 
 max_finished_seqs = 0
-max_running_seqs = 1
+max_running_seqs = 2
 
-block_num = 6
-block_size = 16
+block_num = 25
+block_size = 4
 
 class Qwen2:
 
@@ -149,7 +149,7 @@ class Qwen2:
 
     def generate(
         self,
-        inputs: Sequence[int], # 支持批次
+        inputs: Sequence[int],
         max_new_tokens: int = 128,
         top_k: int = 1,
         top_p: float = 0.8,
@@ -166,12 +166,15 @@ class Qwen2:
         LIB_LLAISYS.llaisysQwen2SchedulerAdd(self.model, 
             ctypes.c_uint64(0),
             ctypes.cast((ctypes.c_int64 * prefill_len)(*inputs), ctypes.POINTER(ctypes.c_int64)),
-            ctypes.c_size_t(prefill_len)
+            ctypes.c_size_t(prefill_len),
+            max_new_tokens
         )
 
         print("Generating...", flush=True)
+        round=0
+        while True:
+            round += 1
 
-        for i in range(1+max_new_tokens):
             nseq = (ctypes.c_uint64 * max_running_seqs)()
             seq_len = (ctypes.c_uint64 * max_running_seqs)()
             seq_ids = (ctypes.c_uint64 * max_running_seqs)()
@@ -189,9 +192,54 @@ class Qwen2:
             assert(seq_len[0] == 1)
             new_token = token_ids[0]
 
-            print(f"Round {i}, token:", new_token, flush=True)
+            print(f"Round {round}, token:", new_token, flush=True)
 
             output.append(new_token)
 
         
         return output
+    
+    def add_request(
+        self,
+        id: int,
+        inputs: Sequence[int],
+        max_new_tokens: int = 128,
+        top_k: int = 1,
+        top_p: float = 0.8,
+        temperature: float = 0.8,
+    ):
+        LIB_LLAISYS.llaisysQwen2SchedulerAdd(self.model, 
+            ctypes.c_uint64(id),
+            ctypes.cast((ctypes.c_int64 * len(inputs))(*inputs), ctypes.POINTER(ctypes.c_int64)),
+            ctypes.c_size_t(len(inputs)),
+            max_new_tokens
+        )
+
+
+    def step(
+        self
+    ):
+        nseq = (ctypes.c_uint64 * max_running_seqs)()
+        seq_len = (ctypes.c_uint64 * max_running_seqs)()
+        seq_ids = (ctypes.c_uint64 * max_running_seqs)()
+        token_ids = (ctypes.c_int64 * max_running_seqs)()
+
+
+        finished = LIB_LLAISYS.llaisysQwen2SchedulerStep(
+            self.model,
+            nseq, seq_len, seq_ids, token_ids
+        )
+
+        res = []
+        pre = 0
+        for i in range(nseq[0]):
+            l = seq_len[i]
+            res.append({
+                'id': seq_ids[i],
+                'tokens': list(token_ids[pre:pre+l])
+            })
+            pre += l
+            
+        return finished, res
+
+

@@ -74,6 +74,9 @@ namespace PagedCache {
         ASSERT_(blocks[id].ref_count == 0);
         used_block_ids.erase(block_id);
         free_block_ids.push(block_id);
+        if(blocks[block_id].hash != invalid_hash){
+            hash2id.erase(blocks[block_id].hash);
+        }
         DEBUG("deallocate block (id=%ld)", block_id);
     }
 
@@ -100,8 +103,8 @@ namespace PagedCache {
         else return std::make_pair(false, -1);
     }
 
-    Sequence::Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token)
-    :_id(seq_id), _token_ids(seq_tokens), _manager(manager), _eos(eos_token){
+    Sequence::Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token, uint64_t max_tokens)
+    :_id(seq_id), _token_ids(seq_tokens), _manager(manager), _eos(eos_token), _max_tokens(max_tokens){
         ASSERT_(manager!=nullptr);
         _prompt_tokens = seq_tokens.size();
         _cached_tokens = 0;
@@ -179,6 +182,7 @@ namespace PagedCache {
                 _cached_tokens += block_sz();
                 // 更新block的引用计数
                 _manager->add_ref_block(block_id);
+                printf("Hit Cache\n");
             }
             block_table.push_back(block_id);
         }
@@ -219,6 +223,7 @@ namespace PagedCache {
     void Sequence::add_token(token_t new_token){
         _token_ids.push_back(new_token);
         if(new_token == _eos) status = SequenceStatus::FINISHED;
+        if(_max_tokens!=0 && _token_ids.size()>_max_tokens) status = SequenceStatus::FINISHED;
     }
 
     std::byte* Sequence::get_kvcache(uint64_t layer_i, bool is_v, uint64_t token_i){
@@ -243,43 +248,60 @@ namespace PagedCache {
         waiting.push_back(seq);
     }
 
-    void Scheduler::add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token){
-        waiting.emplace_back(seq_id, seq_tokens, manager.get(), eos_token);
+    void Scheduler::add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token, uint64_t max_tokens){
+        waiting.emplace_back(seq_id, seq_tokens, manager.get(), eos_token, max_tokens);
     }
 
     std::pair<std::vector<Sequence*>, bool> Scheduler::schedule(){
         uint64_t num_seqs=0;
         std::vector<Sequence*> scheduled_seqs;
         // prefill
-        while(!waiting.empty() && num_seqs <= max_running_seqs){
+        while(!waiting.empty() && running.size() < max_running_seqs && num_seqs < max_running_seqs){
             Sequence seq = waiting.front();
-            bool can_allocate = seq.allocate();
-            if(!can_allocate) break;
+            bool allocated = true;
+            while(!seq.allocate()){
+                printf("seq%ld cannot prefill more\n", seq.get_id());
+                if(!finished.empty()){
+                    printf("try to deallocate finished seq%ld\n", finished.front().get_id());
+                    finished.front().deallocate();
+                    finished.pop_front();
+                }else{
+                    allocated = false;
+                    break;
+                }
+            }
+            if(!allocated) break;
             seq.status = SequenceStatus::RUNNING;
             waiting.pop_front();
             running.push_back(seq);
             num_seqs += 1;
-            scheduled_seqs.push_back(&running.back());
+            if(seq.num_cached()<seq.num_tokens()) // 如果cache全部命中，则无须prefill
+                scheduled_seqs.push_back(&running.back());
         }
         if(!scheduled_seqs.empty())
             return std::make_pair(scheduled_seqs, true);
 
         // decode
         std::vector<Sequence> t;
-        while(!running.empty() && num_seqs <= max_running_seqs){
+        while(!running.empty() && num_seqs < max_running_seqs){
             Sequence seq = running.front();
             running.pop_front();
             if(seq.is_finished()){
+                printf("seq%ld finished\n", seq.get_id());
                 continue;
             }
             while(!seq.can_append()){
+                printf("seq%ld cannot decode more\n", seq.get_id());
                 if(!finished.empty()){
+                    printf("try to deallocate finished seq%ld\n", finished.front().get_id());
                     finished.front().deallocate();
                     finished.pop_front();
                 }else if(!running.empty()){
+                    printf("try to deallocate running seq%ld\n", running.back().get_id());
                     preempt(running.back());  // 释放队尾的seq来满足新来的seq（调度策略:后进先出）
                     running.pop_back();
                 }else{
+                    printf("have to deallocate itself\n");
                     preempt(seq);
                     break;
                 }

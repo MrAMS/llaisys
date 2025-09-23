@@ -90,7 +90,7 @@ namespace PagedCache {
     public:
         SequenceStatus status;
 
-        Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token);
+        Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token, uint64_t max_tokens=0);
 
         /* 为所有token分配KVCache Block */
         bool allocate();
@@ -132,10 +132,12 @@ namespace PagedCache {
         uint64_t _id;
         std::vector<token_t> _token_ids;
         BlockManager* _manager;
-        token_t _eos;
 
         uint64_t _prompt_tokens;
         uint64_t _cached_tokens;
+
+        token_t _eos;
+        uint64_t _max_tokens;
 
         std::vector<uint64_t> block_table;
 
@@ -149,7 +151,7 @@ namespace PagedCache {
         bool is_finished() const;
 
         void add(const Sequence& seq);
-        void add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token);
+        void add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token, uint64_t max_tokens=0);
 
 
         std::pair<std::vector<Sequence*>, bool> schedule(); // return <scheduled_seqs, is_prefill>
