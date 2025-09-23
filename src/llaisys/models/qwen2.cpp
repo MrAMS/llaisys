@@ -211,24 +211,15 @@ __C {
             // DEBUG_TENSOR(v_new);
 
             // 从KV Cache中获取完整的K和V
-            printf("kcache: ");
             std::vector<std::byte*> k;
-            for(size_t i=0;i<slot_mapping_k.size();++i){
-                k.push_back(slot_mapping_k[i]);
-                printf("%lx ", (size_t)slot_mapping_k[i]);
-            }
-            printf("\nvcache:");
+            for(size_t i=0;i<slot_mapping_k.size();++i) k.push_back(slot_mapping_k[i]);
             std::vector<std::byte*> v;
-            for(size_t i=0;i<slot_mapping_v.size();++i){
-                v.push_back(slot_mapping_v[i]);
-                printf("%lx ", (size_t)slot_mapping_v[i]);
-            }
-            printf("\n");
+            for(size_t i=0;i<slot_mapping_v.size();++i) v.push_back(slot_mapping_v[i]);
 
             // 计算注意力分数
             DEBUG("scores");
             auto scores = Tensor::create({d_seq, head_q, d_v}, dtype, device, device_id);
-            llaisys::ops::self_attention_paged(scores, q, k.data(), v.data(), head_kv, d_seq, 1.f/std::sqrt(d_qk*1.f));
+            llaisys::ops::self_attention_paged(scores, q, k.data(), v.data(), head_kv, k.size(), 1.f/std::sqrt(d_qk*1.f));
             scores = scores->view({d_seq, head_q*d_v});
             
             // 输出投影
@@ -326,9 +317,6 @@ __C {
         printf("nseq=%ld\n", *nseq);
         for(size_t i=0;i<seqs.size();++i){
             auto seq = seqs[i];
-            for(size_t i=0;i<seq->num_tokens();++i)
-                printf("%ld ", *(seq->tokens_ptr()+i));
-            printf("\n");
             llaisys::tensor_t logits= run_model(model, seq, is_prefill);
             const auto new_token = sampler.sample(logits);
 
