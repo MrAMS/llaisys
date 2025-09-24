@@ -8,62 +8,48 @@
 
 #define SIMD_ON 1
 
-#if SIMD_ON
-#include <emmintrin.h> // SSE2
-#include <pmmintrin.h> // SSE3, _mm_hadd_ps
-#endif
-
 /* m*k times k*n add m*n = m*n */
 #if SIMD_ON
+#define SIMD_WIDTH  16
+#define SIMD_NUM    (SIMD_WIDTH/sizeof(float))
+typedef float vec __attribute__ (( vector_size(SIMD_WIDTH) ));
 template<typename T>
 void linear_(T *out, const T *in, const T *weight, const T *bias, size_t m, size_t k, size_t n) {
     // Check for 16-byte alignment to choose the most efficient load instruction.
-    ASSERT(reinterpret_cast<uintptr_t>(in) % 16 == 0, "in must be aligned");
-    ASSERT(reinterpret_cast<uintptr_t>(weight) % 16 == 0, "weight must be aligned");
+    ASSERT(reinterpret_cast<uintptr_t>(in) % SIMD_WIDTH == 0, "in must be aligned");
+    ASSERT(reinterpret_cast<uintptr_t>(weight) % SIMD_WIDTH == 0, "weight must be aligned");
 
     #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            /*
-            float psum = 0;
-            if(bias) psum = TOF(bias[j]);
-            */
-            __m128 sum_vec;
-            sum_vec = _mm_setzero_ps();
-
-            /*
-            for(size_t l=0;l<k;++l){
-                psum += TOF(in[i*k+l]) * TOF(weight[j*k+l]);
-            }
-            */
+            vec sum_vec{};
             size_t l = 0;
-            for (; l + 3 < k; l += 4) {
-                __m128 in_vec, weight_vec;
+            for (; l + SIMD_NUM-1 < k; l += SIMD_NUM) {
+                vec* in_vec;
+                vec* weight_vec;
 
                 if constexpr (std::is_same<T, float>::value){
-                    in_vec = _mm_load_ps(&in[i*k+l]);
-                    weight_vec = _mm_load_ps(&weight[j*k+l]);
+                    in_vec = (vec*)(&in[i*k+l]);
+                    weight_vec = (vec*)(&weight[j*k+l]);
+                    sum_vec += (*in_vec) * (*weight_vec);
                 }else{
-                    float arr_f32_in[4], arr_f32_weight[4];
-                    for(int t=0;t<4;++t){
+                    float arr_f32_in[SIMD_NUM], arr_f32_weight[SIMD_NUM];
+                    for(size_t t=0;t<SIMD_NUM;++t){
                         arr_f32_in[t] = TOF(in[i*k+l +t]);
                     }
-                    in_vec = _mm_load_ps(arr_f32_in);
-                    for(int t=0;t<4;++t){
+                    in_vec = (vec*)(arr_f32_in);
+                    for(size_t t=0;t<SIMD_NUM;++t){
                         arr_f32_weight[t] = TOF(weight[j*k+l +t]);
                     }
-                    weight_vec = _mm_load_ps(arr_f32_weight);
+                    weight_vec = (vec*)(arr_f32_weight);
+                    sum_vec += (*in_vec) * (*weight_vec);
                 }
-                
-                // maybe can use FMA
-                sum_vec = _mm_add_ps(sum_vec, _mm_mul_ps(in_vec, weight_vec));
             }
 
-            float psum;
+            float psum=0;
             
-            __m128 hsum = _mm_hadd_ps(sum_vec, sum_vec);
-            hsum = _mm_hadd_ps(hsum, hsum);
-            _mm_store_ss(&psum, hsum);
+            for(size_t t=0;t<SIMD_NUM;++t)
+                psum += sum_vec[t];
             
             for (; l < k; ++l) {
                 psum += TOF(in[i * k + l]) * TOF(weight[j * k + l]);
