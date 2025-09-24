@@ -7,10 +7,12 @@
 #include "../../../utils.hpp"
 
 #include <cstdio>
+#include <omp.h>
 
 
 template <typename T>
 void embedding_(T *out, const int64_t *index, size_t index_len, const T *weight, const std::vector<size_t>& shape){
+    #pragma omp parallel for
     for(size_t i=0;i<index_len;++i){
         int64_t idx = index[i];
         CHECK_ARGUMENT(size_t(idx) < shape[0], "Index out of bounds in embedding operation.");

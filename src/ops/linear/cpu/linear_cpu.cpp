@@ -9,7 +9,8 @@
 /* m*k times k*n add m*n = m*n */
 template<typename T>
 void linear_(T *out, const T *in, const T *weight, const T *bias, size_t m, size_t k, size_t n){
-    for(size_t i=0;i<m;++i)
+    for(size_t i=0;i<m;++i){
+        #pragma omp parallel for
         for(size_t j=0;j<n;++j){
             float psum = 0;
             if(bias) psum = TOF(bias[j]);
@@ -18,6 +19,7 @@ void linear_(T *out, const T *in, const T *weight, const T *bias, size_t m, size
             }
             out[i*n+j] = llaisys::utils::cast<T>(psum);
         }
+    }
 }
 
 namespace llaisys::ops::cpu {

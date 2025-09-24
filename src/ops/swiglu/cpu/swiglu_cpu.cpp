@@ -3,10 +3,13 @@
 #include <cmath>
 #include "../../../utils.hpp"
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 template<typename T>
 void swiglu_(T *out, const T *up, const T *gate, size_t len){
+    #pragma omp parallel for
     for(size_t i = 0; i < len; ++i){
         const auto up_val = TOF(up[i]);
         const auto gate_val = TOF(gate[i]);

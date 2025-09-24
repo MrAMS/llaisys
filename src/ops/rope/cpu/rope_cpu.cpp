@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 template<typename T>
@@ -11,6 +13,7 @@ void rope_(T *out, const T *in, const int64_t *pos_ids, size_t d_seq, size_t d_h
     // 对每个token进行RoPE编码
     for(size_t s=0;s<d_seq;++s){
         const auto pos_id = pos_ids[s];
+        #pragma omp parallel for
         for(size_t h=0;h<d_head;++h){
             for(size_t i=0;i<d/2;++i){
                 // RoPE角度

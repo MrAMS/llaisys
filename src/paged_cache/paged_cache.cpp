@@ -59,6 +59,7 @@ namespace PagedCache {
     }
 
     uint64_t BlockManager::allocate_block(uint64_t hash){
+        ASSERT_(!free_block_ids.empty());
         uint64_t id = free_block_ids.front();
         ASSERT_(blocks[id].ref_count == 0);
         blocks[id].reset();
@@ -183,7 +184,7 @@ namespace PagedCache {
                 _cached_tokens += block_sz();
                 // 更新block的引用计数
                 _manager->add_ref_block(block_id);
-                printf("Hit Cache\n");
+                printf("Hit Cache %" PRId64 "\n", block_id);
             }
             block_table.push_back(block_id);
         }
@@ -224,7 +225,7 @@ namespace PagedCache {
     void Sequence::add_token(token_t new_token){
         _token_ids.push_back(new_token);
         if(new_token == _eos) status = SequenceStatus::FINISHED;
-        if(_max_tokens!=0 && _token_ids.size()>_max_tokens) status = SequenceStatus::FINISHED;
+        if(_max_tokens!=0 && _token_ids.size()-_prompt_tokens>_max_tokens) status = SequenceStatus::FINISHED;
     }
 
     std::byte* Sequence::get_kvcache(uint64_t layer_i, bool is_v, uint64_t token_i){

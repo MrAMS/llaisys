@@ -8,6 +8,7 @@ add_includedirs("include")
 add_rules("plugin.compile_commands.autoupdate")
 
 add_requires("xxhash")
+add_requires("openmp")
 
 -- CPU --
 includes("xmake/cpu.lua")
@@ -89,6 +90,7 @@ target_end()
 target("llaisys-ops")
     set_kind("static")
     add_deps("llaisys-ops-cpu")
+
 
     set_languages("cxx17")
     set_warnings("all", "error")

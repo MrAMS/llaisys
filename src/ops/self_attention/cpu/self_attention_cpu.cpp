@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 template<typename T>
@@ -14,6 +16,7 @@ void self_attention_(T *attn_val, const T *q, const T *k, const T *v,
         // attn_val: [d_seq, d_head, d_v], q: [d_seq, d_head, d_qk]
         // k: [d_tot, d_kvhead, d_qk], v: [d_tot, d_kvhead, d_v]
         for(size_t s=0;s<d_seq;++s){ // 遍历scores矩阵的每一行
+            #pragma omp parallel for
             for(size_t h=0;h<d_head;++h){
                 const auto h_kv = h/(d_head/d_kvhead);
                 std::vector<float> attn_scores(d_tot); // 临时数据暂存（scores矩阵中的一行）

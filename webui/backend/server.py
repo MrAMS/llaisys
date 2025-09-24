@@ -34,13 +34,19 @@ async def handle(websocket):
             print(f"Received message from client {user_id}: {message}", flush=True)
             # Make sure we have a conversation history for this user
             if user_id not in history_users:
-                history_users[user_id] = ""
+                history_users[user_id] = []
                 id_users[user_id] = []
 
+            history_users[user_id].append(
+                {"role": "user", "content": message}
+            )
             input_content = tokenizer.apply_chat_template(
-                conversation=[{"role": "user", "content": message}],
+                conversation=history_users[user_id],
                 add_generation_prompt=True,
                 tokenize=False,
+            )
+            history_users[user_id].append(
+                {"role": "assistant", "content": ""}
             )
             # The input needs to be a list of tokens, not the raw text
             input_tokens = tokenizer.encode(input_content)
@@ -76,8 +82,8 @@ async def step_model():
                     # Decode the tokens back to text
                     decoded_text = tokenizer.decode(result.get('tokens'), skip_special_tokens=True)
                     global history_users
-                    history_users[user_id] += decoded_text
-                    print(user_id[:4], history_users[user_id], flush=True)
+                    history_users[user_id][-1]['content'] += decoded_text
+                    print(user_id[:4], ":", history_users[user_id][-1]['content'], flush=True)
                     # Send the response to the user
                     await websocket.send(decoded_text)
         except Exception as e:

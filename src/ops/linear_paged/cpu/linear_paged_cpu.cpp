@@ -4,12 +4,15 @@
 #include <cmath>
 #include <cstddef>
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 /* m*k times k*n add m*n = m*n */
 template<typename T>
 void linear_paged_(T **out_map, const T *in, const T *weight, const T *bias, size_t m, size_t k, size_t n){
-    for(size_t i=0;i<m;++i)
+    for(size_t i=0;i<m;++i){
+        #pragma omp parallel for
         for(size_t j=0;j<n;++j){
             float psum = 0;
             if(bias) psum = TOF(bias[j]);
@@ -18,6 +21,7 @@ void linear_paged_(T **out_map, const T *in, const T *weight, const T *bias, siz
             }
             out_map[i][j] = llaisys::utils::cast<T>(psum);
         }
+    }
 }
 
 namespace llaisys::ops::cpu {

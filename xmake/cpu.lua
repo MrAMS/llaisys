@@ -16,6 +16,9 @@ target("llaisys-ops-cpu")
     add_deps("llaisys-tensor")
     set_languages("cxx17")
     set_warnings("all", "error")
+
+    add_packages("openmp")
+
     if not is_plat("windows") then
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")
     end

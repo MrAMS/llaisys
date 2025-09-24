@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 template<typename T>
@@ -11,6 +13,7 @@ void rope_paged_(T **out_map, const T* const* in_map, const int64_t *pos_ids, si
     // 对每个token进行rope_paged编码
     for(size_t s=0;s<d_seq;++s){
         const auto pos_id = pos_ids[s];
+        #pragma omp parallel for
         for(size_t h=0;h<d_head;++h){
             for(size_t i=0;i<d/2;++i){
                 auto in = in_map[s];

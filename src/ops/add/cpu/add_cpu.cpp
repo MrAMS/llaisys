@@ -4,8 +4,11 @@
 
 #include <cmath>
 
+#include <omp.h>
+
 template <typename T>
 void add_(T *c, const T *a, const T *b, size_t numel) {
+    #pragma omp parallel for
     for (size_t i = 0; i < numel; i++) {
         const float sum = llaisys::utils::cast<float>(a[i]) + llaisys::utils::cast<float>(b[i]);
         c[i] = llaisys::utils::cast<T>(sum);

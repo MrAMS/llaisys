@@ -3,11 +3,14 @@
 #include <cmath>
 #include "../../../utils.hpp"
 
+#include <omp.h>
+
 #define TOF(X) llaisys::utils::cast<float>(X)
 
 template<typename T>
 void rms_norm_(T *out, const T *in, const T *weight, size_t m, size_t n, float eps){
     // weight:1*n, in:m*n, out:m*n 
+    #pragma omp parallel for
     for(size_t i=0;i<m;++i){
         // 计算每行的RMS
         float rms_row = 0;
