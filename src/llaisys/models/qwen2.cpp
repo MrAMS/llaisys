@@ -130,7 +130,8 @@ __C {
         auto sampler = llaisys::sampler::SamplerArgmax();
         auto [seqs, is_prefill] = scheduler->schedule();
         *nseq = seqs.size();
-        printf("nseq=%" PRId64 "\n", *nseq);
+        if(*nseq > 0)
+            printf("nseq=%" PRId64 "\n", *nseq);
         for(size_t i=0;i<seqs.size();++i){
             auto seq = seqs[i];
             llaisys::tensor_t logits= run_model(model, seq, is_prefill);

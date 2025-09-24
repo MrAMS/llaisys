@@ -234,9 +234,12 @@ class Qwen2:
         pre = 0
         for i in range(nseq[0]):
             l = seq_len[i]
+            # tokens = []
+            # for j in range(pre, pre+l):
+            #     tokens.append(token_ids[j])
             res.append({
                 'id': seq_ids[i],
-                'tokens': list(token_ids[pre:pre+l])
+                'tokens': token_ids[pre:pre+l],
             })
             pre += l
             

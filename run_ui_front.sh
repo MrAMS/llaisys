@@ -1,0 +1,1 @@
+cd webui/chatbot-ui && pnpm run dev
