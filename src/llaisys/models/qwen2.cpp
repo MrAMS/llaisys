@@ -120,20 +120,21 @@ __C {
         return model->weights;
     }
 
-    void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken, uint64_t max_tokens){
+    void llaisysQwen2SchedulerAdd(struct LlaisysQwen2Model * model, uint64_t seq_id, int64_t * token_ids, size_t ntoken, uint64_t max_tokens, float temperature){
         auto scheduler = (llaisys::PagedCache::Scheduler*)(model->scheduler);
-        scheduler->add(seq_id, std::vector<llaisys::PagedCache::token_t>(token_ids, token_ids+ntoken), model->meta->end_token, max_tokens);
+        scheduler->add(seq_id, std::vector<llaisys::PagedCache::token_t>(token_ids, token_ids+ntoken), model->meta->end_token, max_tokens, temperature);
     }
 
     bool llaisysQwen2SchedulerStep(struct LlaisysQwen2Model * model, uint64_t* nseq, uint64_t* seq_len, uint64_t* seq_ids, int64_t* token_ids){
         auto scheduler = (llaisys::PagedCache::Scheduler*)(model->scheduler);
-        auto sampler = llaisys::sampler::SamplerArgmax();
         auto [seqs, is_prefill] = scheduler->schedule();
         *nseq = seqs.size();
         if(*nseq > 0)
             printf("nseq=%" PRId64 "\n", *nseq);
         for(size_t i=0;i<seqs.size();++i){
             auto seq = seqs[i];
+            auto sampler = llaisys::sampler::SamplerGumbelmax(seq->temperature());
+
             llaisys::tensor_t logits= run_model(model, seq, is_prefill);
             const auto new_token = sampler.sample(logits);
 

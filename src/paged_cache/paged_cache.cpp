@@ -105,8 +105,8 @@ namespace PagedCache {
         else return std::make_pair(false, -1);
     }
 
-    Sequence::Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token, uint64_t max_tokens)
-    :_id(seq_id), _token_ids(seq_tokens), _manager(manager), _eos(eos_token), _max_tokens(max_tokens){
+    Sequence::Sequence(uint64_t seq_id, const std::vector<token_t>& seq_tokens, BlockManager* manager, token_t eos_token, uint64_t max_tokens, float temperature)
+    :_id(seq_id), _token_ids(seq_tokens), _manager(manager), _eos(eos_token), _max_tokens(max_tokens), _temperature(temperature){
         ASSERT_(manager!=nullptr);
         _prompt_tokens = seq_tokens.size();
         _cached_tokens = 0;
@@ -250,8 +250,8 @@ namespace PagedCache {
         waiting.push_back(seq);
     }
 
-    void Scheduler::add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token, uint64_t max_tokens){
-        waiting.emplace_back(seq_id, seq_tokens, manager.get(), eos_token, max_tokens);
+    void Scheduler::add(uint64_t seq_id, const std::vector<token_t>& seq_tokens, token_t eos_token, uint64_t max_tokens, float temperature){
+        waiting.emplace_back(seq_id, seq_tokens, manager.get(), eos_token, max_tokens, temperature);
     }
 
     std::pair<std::vector<Sequence*>, bool> Scheduler::schedule(){

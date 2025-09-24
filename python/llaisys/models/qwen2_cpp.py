@@ -167,7 +167,8 @@ class Qwen2:
             ctypes.c_uint64(0),
             ctypes.cast((ctypes.c_int64 * prefill_len)(*inputs), ctypes.POINTER(ctypes.c_int64)),
             ctypes.c_size_t(prefill_len),
-            max_new_tokens
+            max_new_tokens,
+            0
         )
 
         print("Generating...", flush=True)
@@ -204,15 +205,14 @@ class Qwen2:
         id: int,
         inputs: Sequence[int],
         max_new_tokens: int = 128,
-        top_k: int = 1,
-        top_p: float = 0.8,
         temperature: float = 0.8,
     ):
         LIB_LLAISYS.llaisysQwen2SchedulerAdd(self.model, 
             ctypes.c_uint64(id),
             ctypes.cast((ctypes.c_int64 * len(inputs))(*inputs), ctypes.POINTER(ctypes.c_int64)),
             ctypes.c_size_t(len(inputs)),
-            max_new_tokens
+            max_new_tokens,
+            temperature
         )
 
 
