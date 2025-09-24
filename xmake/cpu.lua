@@ -18,6 +18,7 @@ target("llaisys-ops-cpu")
     set_warnings("all", "error")
 
     add_packages("openmp")
+    add_vectorexts("sse2", "sse3")
 
     if not is_plat("windows") then
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")

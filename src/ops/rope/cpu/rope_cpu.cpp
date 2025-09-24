@@ -11,11 +11,11 @@
 template<typename T>
 void rope_(T *out, const T *in, const int64_t *pos_ids, size_t d_seq, size_t d_head, size_t d, float theta){
     // 对每个token进行RoPE编码
+    #pragma omp parallel for collapse(3)
     for(size_t s=0;s<d_seq;++s){
-        const auto pos_id = pos_ids[s];
-        #pragma omp parallel for
         for(size_t h=0;h<d_head;++h){
             for(size_t i=0;i<d/2;++i){
+                const auto pos_id = pos_ids[s];
                 // RoPE角度
                 const auto phi = pos_id/std::pow(theta, 2.f*i/d);
                 const auto cos_phi = std::cos(phi);

@@ -31,7 +31,7 @@
 
 static llaisys::tensor_t run_model(struct LlaisysQwen2Model * model, llaisys::PagedCache::Sequence* seq, bool is_prefill);
 
-__C {
+___C {
     struct LlaisysQwen2Model *llaisysQwen2ModelCreate(const LlaisysQwen2Meta *meta, llaisysDeviceType_t device, int *device_ids, int ndevice){
         auto model = new LlaisysQwen2Model;
 

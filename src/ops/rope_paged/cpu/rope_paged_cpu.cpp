@@ -11,11 +11,11 @@
 template<typename T>
 void rope_paged_(T **out_map, const T* const* in_map, const int64_t *pos_ids, size_t d_seq, size_t d_head, size_t d, float theta){
     // 对每个token进行rope_paged编码
+    #pragma omp parallel for collapse(3)
     for(size_t s=0;s<d_seq;++s){
-        const auto pos_id = pos_ids[s];
-        #pragma omp parallel for
         for(size_t h=0;h<d_head;++h){
             for(size_t i=0;i<d/2;++i){
+                const auto pos_id = pos_ids[s];
                 auto in = in_map[s];
                 auto out = out_map[s];
 

@@ -4,7 +4,7 @@
 
 #include "../ops/ops.hpp"
 
-__C {
+___C {
     void llaisysAdd(llaisysTensor_t c, llaisysTensor_t a, llaisysTensor_t b) {
         llaisys::ops::add(c->tensor, a->tensor, b->tensor);
     }

@@ -4,7 +4,7 @@
 #include "../tensor.h"
 #include <cmath>
 
-__C {
+___C {
     struct LlaisysQwen2Meta {
         llaisysDataType_t dtype;
         size_t nlayer; // num_hidden_layers

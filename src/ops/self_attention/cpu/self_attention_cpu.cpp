@@ -15,8 +15,8 @@ void self_attention_(T *attn_val, const T *q, const T *k, const T *v,
     float scale, size_t d_seq, size_t d_head, size_t d_v, size_t d_qk, size_t d_kvhead, size_t d_tot){
         // attn_val: [d_seq, d_head, d_v], q: [d_seq, d_head, d_qk]
         // k: [d_tot, d_kvhead, d_qk], v: [d_tot, d_kvhead, d_v]
+        #pragma omp parallel for collapse(2)
         for(size_t s=0;s<d_seq;++s){ // 遍历scores矩阵的每一行
-            #pragma omp parallel for
             for(size_t h=0;h<d_head;++h){
                 const auto h_kv = h/(d_head/d_kvhead);
                 std::vector<float> attn_scores(d_tot); // 临时数据暂存（scores矩阵中的一行）
