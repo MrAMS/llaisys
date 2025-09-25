@@ -24,7 +24,6 @@
 typedef float vec __attribute__ (( vector_size(SIMD_WIDTH) ));
 template<typename T>
 void linear_paged_(T **out_map, const T *in, const T *weight, const T *bias, size_t m, size_t k, size_t n) {
-    // Check for 16-byte alignment to choose the most efficient load instruction.
     ASSERT(reinterpret_cast<uintptr_t>(in) % SIMD_WIDTH == 0, "in must be aligned");
     ASSERT(reinterpret_cast<uintptr_t>(weight) % SIMD_WIDTH == 0, "weight must be aligned");
 

@@ -1,0 +1,1 @@
+./run_build.sh && python test/ops/$1.py --profile
