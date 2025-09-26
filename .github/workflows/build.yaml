@@ -58,14 +58,3 @@ jobs:
     - name: Assignment-3
       run: |
         python test/test_infer.py --test
-    
-    - name: profile
-      run: |
-        python test/ops/add.py --profile
-        python test/ops/argmax.py --profile
-        python test/ops/embedding.py --profile
-        python test/ops/linear.py --profile
-        python test/ops/rms_norm.py --profile
-        python test/ops/rope.py --profile
-        python test/ops/self_attention.py --profile
-        python test/ops/swiglu.py --profile

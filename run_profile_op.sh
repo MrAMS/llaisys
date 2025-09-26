@@ -1,1 +1,2 @@
-./run_build.sh && python test/ops/$1.py --profile
+./run_build.sh && \
+    python test/ops/$1.py --profile

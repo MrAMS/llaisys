@@ -300,7 +300,7 @@ namespace PagedCache {
                     finished.pop_front();
                 }else if(!running.empty()){
                     printf("try to deallocate running seq%" PRId64 "\n", running.back().get_id());
-                    preempt(running.back());  // 释放队尾的seq来满足新来的seq（调度策略:后进先出）
+                    preempt(running.back());  // 释放队尾的seq来满足当前的seq
                     running.pop_back();
                 }else{
                     printf("have to deallocate itself\n");
