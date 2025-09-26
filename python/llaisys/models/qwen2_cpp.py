@@ -18,17 +18,14 @@ load_qwen2_cpp(LIB_LLAISYS)
 
 from huggingface_hub import snapshot_download
 
-max_finished_seqs = 0
-max_running_seqs = 2
-
-block_num = 25
-block_size = 4
-
 class Qwen2:
 
-    def __init__(self, model_path, device: DeviceType = DeviceType.CPU):
+    def __init__(self, model_path, device: DeviceType = DeviceType.CPU, block_num = 50, block_size = 4, max_running_seqs=2):
         model_path = Path(model_path)
         self.device = device
+        self.block_size = 4
+        self.block_num = 150
+        self.max_running_seqs = max_running_seqs
 
         print("Reading config...", flush=True)
         with open(model_path / 'config.json', 'r') as config_file:
@@ -46,10 +43,10 @@ class Qwen2:
         self.per_head_dim = self.hidden_size // self.num_atten_heads
         self.per_kvhead_dim = self.per_head_dim
         self.dtype = DataType.from_config_json(config.get('torch_dtype'))
-        if device == DeviceType.CPU:
-            if self.dtype == DataType.BF16:
-                # 在CPU上直接使用FP32权重以加速
-                self.dtype = DataType.F32
+        # if device == DeviceType.CPU:
+        #     if self.dtype == DataType.BF16:
+        #         # 在CPU上直接使用FP32权重以加速
+        #         self.dtype = DataType.F32
 
         print("Model config loaded:", {
             "dtype":self.dtype,
@@ -80,7 +77,6 @@ class Qwen2:
             theta=self.rope_theta,
             end_token=self.eos_token_id,
             max_running_seqs=max_running_seqs,
-            max_finished_seqs=max_finished_seqs,
             block_num=block_num,
             block_size=block_size,
         )
@@ -176,21 +172,19 @@ class Qwen2:
         while True:
             round += 1
 
-            nseq = (ctypes.c_uint64 * max_running_seqs)()
-            seq_len = (ctypes.c_uint64 * max_running_seqs)()
-            seq_ids = (ctypes.c_uint64 * max_running_seqs)()
-            token_ids = (ctypes.c_int64 * max_running_seqs)()
+            nseq = (ctypes.c_uint64 * self.max_running_seqs)()
+            seq_len = (ctypes.c_uint64 * self.max_running_seqs)()
+            seq_ids = (ctypes.c_uint64 * self.max_running_seqs)()
+            token_ids = (ctypes.c_int64 * self.max_running_seqs)()
 
 
-            finished = LIB_LLAISYS.llaisysQwen2SchedulerStep(
+            LIB_LLAISYS.llaisysQwen2SchedulerStep(
                 self.model,
                 nseq, seq_len, seq_ids, token_ids
             )
-
-            if finished:
-                break
             
-            assert(seq_len[0] == 1)
+            if seq_len[0] == 0:
+                break
             new_token = token_ids[0]
 
             print(f"Round {round}, token:", new_token, flush=True)
@@ -219,10 +213,10 @@ class Qwen2:
     def step(
         self
     ):
-        nseq = (ctypes.c_uint64 * max_running_seqs)()
-        seq_len = (ctypes.c_uint64 * max_running_seqs)()
-        seq_ids = (ctypes.c_uint64 * max_running_seqs)()
-        token_ids = (ctypes.c_int64 * max_running_seqs)()
+        nseq = (ctypes.c_uint64 * self.max_running_seqs)()
+        seq_len = (ctypes.c_uint64 * self.max_running_seqs)()
+        seq_ids = (ctypes.c_uint64 * self.max_running_seqs)()
+        token_ids = (ctypes.c_int64 * self.max_running_seqs)()
 
 
         finished = LIB_LLAISYS.llaisysQwen2SchedulerStep(

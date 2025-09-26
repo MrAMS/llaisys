@@ -144,7 +144,8 @@ ___C {
             
             scheduler->postprocess(seq, new_token);
         }
-        return scheduler->is_finished();
+        ASSERT(seqs.size()==0 || !scheduler->is_finished(), "unfinished");
+        return is_prefill;
     }
 
 }

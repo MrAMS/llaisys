@@ -10,6 +10,7 @@ from huggingface_hub import snapshot_download
 from test_utils import *
 
 import os, io, sys
+import time
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 # Dictionary to store active users and their websockets
@@ -51,7 +52,7 @@ async def handle(websocket):
             # The input needs to be a list of tokens, not the raw text
             input_tokens = tokenizer.encode(input_content)
 
-            model.add_request(id_tot, input_tokens, 40)
+            model.add_request(id_tot, input_tokens, 80)
             id_users[user_id].append(id_tot)
             id_tot += 1
     
@@ -67,23 +68,46 @@ async def handle(websocket):
     except Exception as e:
         print(f"Error for client {user_id}: {e}", flush=True)
 
+perf_prefill = {
+    'time': 0.0,
+    'cnt': 0,
+}
+
+perf_decode = {
+    'time': 0.0,
+    'cnt': 0
+}
+
 async def step_model():
     while True:
         try:
             # Step the model and get results
-            _, results = model.step()
+            start_time = time.perf_counter()
+            is_prefill, results = model.step()
+            execution_time = time.perf_counter() - start_time
             for result in results:
                 id = result.get('id')
                 user_id = next((key for key, value in id_users.items() if id in value), None)
 
                 if user_id and user_id in active_users:
                     websocket = active_users[user_id]
-                    
+                    tokens = result.get('tokens')
+                    global perf_prefill, perf_decode
+                    if is_prefill:
+                        perf_prefill['cnt'] += len(tokens)
+                        perf_prefill['time'] += execution_time
+                    else:
+                        perf_decode['cnt'] += len(tokens)
+                        perf_decode['time'] += execution_time
                     # Decode the tokens back to text
-                    decoded_text = tokenizer.decode(result.get('tokens'), skip_special_tokens=True)
+                    decoded_text = tokenizer.decode(tokens, skip_special_tokens=True)
                     global history_users
                     history_users[user_id][-1]['content'] += decoded_text
-                    print(user_id[:4], ":", history_users[user_id][-1]['content'], flush=True)
+                    print(user_id[:4], history_users[user_id][-1]['content'], flush=True)
+                    if is_prefill:
+                        print(f"prefill {perf_prefill['cnt']/perf_prefill['time'] : .2f} tokens/s")
+                    else:
+                        print(f"decoding {perf_decode['cnt']/perf_decode['time'] : .2f} tokens/s")
                     # Send the response to the user
                     await websocket.send(decoded_text)
         except Exception as e:
@@ -104,7 +128,7 @@ def load_tokenizer(model_path=None, device_name="cpu"):
     return tokenizer, model_path
 
 def load_llaisys_model(model_path, device_name):
-    model = llaisys.models.Qwen2(model_path, llaisys_device(device_name))
+    model = llaisys.models.Qwen2(model_path, llaisys_device(device_name), block_num = 200, block_size = 4, max_running_seqs=2)
     return model
 
 async def main():
